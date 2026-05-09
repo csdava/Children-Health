@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}小勇士健康管理系统{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            text-decoration: none;
+            text-align: center;
+        }
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+        .btn-warning {
+            background: #FF9800;
+            color: white;
+        }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* Icon styles */
+        .icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1em;
+            height: 1em;
+            font-style: normal;
+        }
+        .icon-star::before { content: "\2605"; color: #FFD700; }
+        .icon-check::before { content: "\2713"; color: #4CAF50; }
+        .icon-cross::before { content: "\2717"; color: #999; }
+        .icon-plus::before { content: "\2715"; color: #2196F3; }
+        .icon-arrow::before { content: "\2192"; }
+        .icon-arrow-left::before { content: "\2190"; }
+        .icon-arrow-up::before { content: "\2191"; }
+        .icon-arrow-down::before { content: "\2193"; }
+        .icon-bullet::before { content: "\25CF"; font-size: 0.5em; vertical-align: middle; }
+        .icon-circle::before { content: "\25CB"; }
+        .icon-square::before { content: "\25A0"; }
+        .icon-triangle::before { content: "\25B2"; }
+        .icon-warning::before { content: "\26A0"; color: #FF9800; }
+        .icon-info::before { content: "\24D8"; color: #2196F3; }
+        .icon-child::before { content: "\2640"; }
+        .icon-parent::before { content: "\2641"; }
+        .icon-school::before { content: "\2302"; }
+        .icon-male::before { content: "\2642"; }
+        .icon-female::before { content: "\2640"; }
+        .icon-crown::before { content: "\265A"; color: #FFD700; }
+        .icon-sword::before { content: "\2694"; color: #666; }
+        .icon-trophy::before { content: "\265B"; color: #FFD700; }
+        .icon-medal::before { content: "\265C"; color: #FFA500; }
+        .icon-target::before { content: "\25CE"; color: #9C27B0; }
+        .icon-flame::before { content: "\2632"; color: #ff6b6b; }
+        .icon-leaf::before { content: "\2618"; color: #4CAF50; }
+        .icon-drop::before { content: "\2619"; color: #2196F3; }
+        .icon-sun::before { content: "\2600"; color: #FFA500; }
+        .icon-moon::before { content: "\263D"; color: #9C27B0; }
+        .icon-hand::before { content: "\261E"; color: #4CAF50; }
+        .icon-food::before { content: "\261F"; }
+        .icon-meat::before { content: "\2630"; color: #d32f2f; }
+        .icon-veg::before { content: "\2618"; color: #4CAF50; }
+        .icon-fruit::before { content: "\2619"; color: #ff9800; }
+        .icon-milk::before { content: "\2619"; color: #e1bee7; }
+        .icon-grain::before { content: "\2606"; color: #ffeb3b; }
+        .icon-bed::before { content: "\263F"; color: #3f51b5; }
+        .icon-run::before { content: "\21BB"; color: #4CAF50; }
+        .icon-wash::before { content: "\2618"; color: #00bcd4; }
+        .icon-camera::before { content: "\2316"; color: #666; }
+        .icon-upload::before { content: "\2913"; color: #4CAF50; }
+        .icon-download::before { content: "\2915"; color: #2196F3; }
+        .icon-lock::before { content: "\26BF"; color: #666; }
+        .icon-key::before { content: "\26B7"; color: #FFA500; }
+        .icon-book::before { content: "\261F"; color: #795548; }
+        .icon-chart::before { content: "\2261"; color: #2196F3; }
+        .icon-fire::before { content: "\2600"; color: #ff5722; }
+        .icon-ice::before { content: "\2744"; color: #00bcd4; }
+        .icon-home::before { content: "\2302"; }
+        .icon-user::before { content: "\263A"; }
+        .icon-users::before { content: "\263B"; }
+        .icon-clock::before { content: "\231A"; color: #666; }
+        .icon-calendar::before { content: "\261F"; color: #666; }
+        .icon-mail::before { content: "\2709"; color: #2196F3; }
+        .icon-edit::before { content: "\270E"; color: #666; }
+        .icon-trash::before { content: "\2715"; color: #f44336; }
+        .icon-save::before { content: "\2714"; color: #4CAF50; }
+        .icon-settings::before { content: "\2699"; color: #666; }
+        .icon-search::before { content: "\2315"; color: #666; }
+        .icon-menu::before { content: "\2630"; color: #666; }
+        .icon-card::before { content: "\25A0"; border: 2px solid currentColor; padding: 2px; }
+        .icon-shield::before { content: "\26E8"; color: #9C27B0; }
+        .icon-flag::before { content: "\2691"; color: #f44336; }
+        .icon-bell::before { content: "\2363"; color: #FF9800; }
+        .icon-heart::before { content: "\2665"; color: #e91e63; }
+        .icon-star-empty::before { content: "\2606"; color: #ccc; }
+        .icon-plus-circle::before { content: "\2295"; color: #4CAF50; }
+        .icon-minus-circle::before { content: "\2296"; color: #f44336; }
+        .icon-forward::before { content: "\23D8"; }
+        .icon-back::before { content: "\23D7"; }
+        .icon-play::before { content: "\25B6"; color: #4CAF50; }
+        .icon-pause::before { content: "\23F8"; color: #FF9800; }
+        .icon-stop::before { content: "\25A0"; color: #f44336; }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

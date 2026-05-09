@@ -1,0 +1,1275 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}小勇士 - 儿童端{% endblock %}
+
+{% block extra_css %}
+<style>
+    .child-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px;
+        background: #f5f5f5;
+        min-height: 100vh;
+    }
+
+    .page-header {
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        color: white;
+        padding: 30px;
+        border-radius: 16px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 30px;
+    }
+
+    .child-info {
+        flex: 1;
+    }
+
+    .child-name {
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .current-date {
+        font-size: 14px;
+        color: #aaa;
+    }
+
+    .level-badge {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: bold;
+        color: #333;
+        font-size: 18px;
+    }
+
+    .warrior-card {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 30px;
+        align-items: center;
+    }
+
+    .warrior-avatar {
+        width: 150px;
+        height: 150px;
+        background: linear-gradient(135deg, #4CAF50, #81C784);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 70px;
+        box-shadow: 0 4px 20px rgba(76, 175, 80, 0.3);
+    }
+
+    .warrior-stats {
+        flex: 1;
+    }
+
+    .stats-title {
+        font-size: 18px;
+        color: #333;
+        margin-bottom: 15px;
+        font-weight: bold;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+
+    .stat-box {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .stat-label {
+        font-size: 14px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .power-section {
+        flex: 1;
+    }
+
+    .power-title {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+
+    .progress-bar {
+        height: 20px;
+        background: #e0e0e0;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #81C784);
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .power-text {
+        text-align: center;
+        margin-top: 10px;
+        font-size: 14px;
+        color: #666;
+    }
+
+    .five-color-section {
+        flex: 1;
+    }
+
+    .gems-container {
+        display: flex;
+        gap: 8px;
+        justify-content: center;
+        margin-top: 10px;
+    }
+
+    .gem {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        opacity: 0.3;
+        transition: all 0.3s;
+        color: white;
+    }
+
+    .gem.active {
+        opacity: 1;
+        box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    .gem-red { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+    .gem-yellow { background: linear-gradient(135deg, #ffd93d, #ffb347); }
+    .gem-green { background: linear-gradient(135deg, #6bcb77, #4CAF50); }
+    .gem-blue { background: linear-gradient(135deg, #4dabf7, #2196F3); }
+    .gem-purple { background: linear-gradient(135deg, #b19fff, #9C27B0); }
+
+    .gem-label {
+        font-size: 10px;
+        color: #666;
+        text-align: center;
+        margin-top: 5px;
+    }
+
+    .tasks-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #f0f0f0;
+    }
+
+    .task-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .task-card {
+        background: #f9f9f9;
+        border-radius: 12px;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        transition: all 0.3s;
+    }
+
+    .task-card:hover {
+        background: #f0f0f0;
+    }
+
+    .task-card.completed {
+        background: #e8f5e9;
+    }
+
+    .task-icon {
+        font-size: 40px;
+        color: #666;
+    }
+
+    .task-details {
+        flex: 1;
+    }
+
+    .task-name {
+        font-size: 16px;
+        font-weight: 500;
+        color: #333;
+        margin-bottom: 5px;
+    }
+
+    .task-reward {
+        font-size: 14px;
+        color: #4CAF50;
+    }
+
+    .task-action {
+        min-width: 120px;
+        text-align: right;
+    }
+
+    .btn-apply {
+        background: linear-gradient(135deg, #4CAF50, #81C784);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        border: none;
+        font-size: 14px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-apply:hover:not(:disabled) {
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+    }
+
+    .btn-apply:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .btn-waiting {
+        background: #666;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    .btn-completed {
+        background: #4CAF50;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .meal-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .meal-upload {
+        border: 2px dashed #4CAF50;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        margin-bottom: 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .meal-upload:hover {
+        background: #f0f9f0;
+    }
+
+    .meal-upload-icon {
+        font-size: 48px;
+        margin-bottom: 10px;
+        color: #666;
+    }
+
+    .meal-upload-text {
+        font-size: 16px;
+        color: #333;
+    }
+
+    .meal-upload-hint {
+        font-size: 12px;
+        color: #999;
+        margin-top: 5px;
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.6);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .modal-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: #999;
+    }
+
+    .upload-options {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .upload-option {
+        flex: 1;
+        padding: 30px;
+        border: 2px dashed #ccc;
+        border-radius: 12px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .upload-option:hover {
+        border-color: #4CAF50;
+        background: #f0f9f0;
+    }
+
+    .upload-option-icon {
+        font-size: 36px;
+        margin-bottom: 10px;
+    }
+
+    .upload-option-text {
+        font-size: 14px;
+        color: #333;
+    }
+
+    #cameraPreview {
+        display: none;
+        width: 100%;
+        max-width: 400px;
+        border-radius: 8px;
+        margin: 0 auto 15px;
+    }
+
+    #capturedPhoto {
+        display: none;
+        width: 100%;
+        max-width: 400px;
+        border-radius: 8px;
+        margin: 0 auto 15px;
+    }
+
+    .camera-controls {
+        display: none;
+        text-align: center;
+        margin-bottom: 15px;
+    }
+
+    .btn-capture {
+        background: #4CAF50;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+
+    .btn-recapture {
+        background: #666;
+        color: white;
+        padding: 12px 30px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        margin-left: 10px;
+    }
+
+    .btn-analyze {
+        background: linear-gradient(135deg, #4CAF50, #81C784);
+        color: white;
+        padding: 15px 40px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        display: none;
+        margin: 0 auto;
+    }
+
+    .btn-analyze:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+    }
+
+    .loading-spinner {
+        display: none;
+        text-align: center;
+        padding: 40px;
+    }
+
+    .spinner {
+        width: 50px;
+        height: 50px;
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #4CAF50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .result-section {
+        display: none;
+    }
+
+    .result-title {
+        font-size: 18px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 15px;
+        text-align: center;
+    }
+
+    .food-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .food-tag {
+        background: #e8f5e9;
+        padding: 8px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+        color: #2e7d32;
+    }
+
+    .nutrition-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .nutrition-item {
+        background: #f9f9f9;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .nutrition-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .nutrition-label {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .score-display {
+        text-align: center;
+        padding: 20px;
+        background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+        border-radius: 12px;
+        margin-bottom: 20px;
+    }
+
+    .score-value {
+        font-size: 48px;
+        font-weight: bold;
+        color: #2e7d32;
+    }
+
+    .score-label {
+        font-size: 16px;
+        color: #666;
+    }
+
+    .gems-display {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .gems-display .gem {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: bold;
+        opacity: 0.3;
+        color: white;
+    }
+
+    .gems-display .gem.active {
+        opacity: 1;
+    }
+
+    .bonus-message {
+        text-align: center;
+        padding: 15px;
+        background: #fff3e0;
+        border-radius: 8px;
+        color: #e65100;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+
+    .meal-records {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+    }
+
+    .meal-record {
+        background: #f9f9f9;
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .meal-type {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+
+    .meal-score {
+        font-size: 24px;
+        font-weight: bold;
+        color: #4CAF50;
+    }
+
+    .meal-score span {
+        font-size: 14px;
+        color: #999;
+    }
+
+    .badges-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .badges-grid {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+    }
+
+    .badge-item {
+        width: 60px;
+        height: 60px;
+        background: #f9f9f9;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+        font-weight: bold;
+        color: #666;
+        position: relative;
+    }
+
+    .badge-item.earned {
+        background: linear-gradient(135deg, #FFD700, #FFA500);
+        color: #333;
+    }
+
+    .badge-item.earned::after {
+        content: 'OK';
+        position: absolute;
+        bottom: -5px;
+        right: -5px;
+        background: #4CAF50;
+        color: white;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        font-size: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .challenge-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .challenge-item {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        padding: 15px;
+        background: #f9f9f9;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+
+    .challenge-icon {
+        font-size: 32px;
+        color: #9C27B0;
+    }
+
+    .challenge-info {
+        flex: 1;
+    }
+
+    .challenge-title {
+        font-size: 16px;
+        font-weight: 500;
+        color: #333;
+    }
+
+    .challenge-progress {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+    }
+
+    .challenge-bar {
+        height: 8px;
+        background: #e0e0e0;
+        border-radius: 4px;
+        margin-top: 8px;
+        overflow: hidden;
+    }
+
+    .challenge-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #4CAF50, #81C784);
+        border-radius: 4px;
+    }
+
+    .encouragement-section {
+        background: white;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 20px;
+    }
+
+    .encouragement-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .encouragement-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 15px;
+        background: #fff3e0;
+        border-radius: 8px;
+    }
+
+    .encouragement-icon {
+        font-size: 20px;
+        color: #FF9800;
+    }
+
+    .encouragement-text {
+        flex: 1;
+        font-size: 14px;
+        color: #333;
+    }
+
+    .encouragement-time {
+        font-size: 12px;
+        color: #999;
+    }
+
+    .encouragement-close {
+        background: none;
+        border: none;
+        color: #999;
+        cursor: pointer;
+        font-size: 18px;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #999;
+    }
+
+    .toast {
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: white;
+        padding: 15px 30px;
+        border-radius: 8px;
+        font-size: 14px;
+        z-index: 1000;
+        animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="child-container">
+    <div class="page-header">
+        <div class="child-info">
+            <div class="child-name">{{ child.nickname }}</div>
+            <div class="current-date">{{ today|date:"Y年m月d日" }}</div>
+        </div>
+        <div class="level-badge">
+            Lv.{{ child.level }} 小勇士
+        </div>
+    </div>
+
+    <div class="warrior-card">
+        <div class="warrior-avatar">
+            {% if child.level >= 5 %}
+                <span class="icon icon-crown"></span>
+            {% elif child.level >= 4 %}
+                <span class="icon icon-shield"></span>
+            {% elif child.level >= 3 %}
+                <span class="icon icon-arrow-up"></span>
+            {% elif child.level >= 2 %}
+                <span class="icon icon-star"></span>
+            {% else %}
+                <span class="icon icon-plus-circle"></span>
+            {% endif %}
+        </div>
+
+        <div class="warrior-stats">
+            <div class="stats-title">小勇士信息</div>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-value">{{ child.power }}</div>
+                    <div class="stat-label">当前体力</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ child.power_to_next }}</div>
+                    <div class="stat-label">升级所需</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">{{ child.level }}</div>
+                    <div class="stat-label">勇士等级</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="power-section">
+            <div class="power-title">升级进度</div>
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ progress_percent }}%"></div>
+            </div>
+            <div class="power-text">{{ child.power }} / {{ child.power_to_next }} 体力</div>
+        </div>
+
+        <div class="five-color-section">
+            <div class="power-title">五色宝石</div>
+            <div class="gems-container">
+                <div class="gem gem-red {% if child.gem_red %}active{% endif %}">米</div>
+                <div class="gem gem-yellow {% if child.gem_yellow %}active{% endif %}">肉</div>
+                <div class="gem gem-green {% if child.gem_green %}active{% endif %}">菜</div>
+                <div class="gem gem-blue {% if child.gem_blue %}active{% endif %}">果</div>
+                <div class="gem gem-purple {% if child.gem_purple %}active{% endif %}">奶</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="meal-section">
+        <h2 class="section-title">AI 膳食识别</h2>
+        <div class="meal-upload" onclick="openMealModal()">
+            <div class="meal-upload-icon"><span class="icon icon-camera"></span></div>
+            <div class="meal-upload-text">点击拍照上传餐食</div>
+            <div class="meal-upload-hint">AI将自动识别食材种类并计算营养</div>
+        </div>
+
+        <h3 style="font-size: 14px; color: #666; margin-bottom: 10px;">今日膳食记录</h3>
+        <div class="meal-records">
+            {% for meal in today_meals %}
+            <div class="meal-record">
+                <div class="meal-type">{{ meal.get_meal_type_display }}</div>
+                <div class="meal-score">{{ meal.total_score }}<span>/5分</span></div>
+            </div>
+            {% empty %}
+            <div class="empty-state" style="grid-column: 1/-1;">
+                <p>暂无膳食记录，点击上方拍照上传</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="tasks-section">
+        <h2 class="section-title">今日任务</h2>
+        <div class="task-grid">
+            {% for item in daily_records %}
+            <div class="task-card {% if item.status == 'completed' %}completed{% endif %}">
+                <div class="task-icon"><span class="icon icon-bullet"></span></div>
+                <div class="task-details">
+                    <div class="task-name">{{ item.task.name }}</div>
+                    <div class="task-reward">+{{ item.task.power_reward }} 体力</div>
+                </div>
+                <div class="task-action">
+                    {% if item.status == 'pending' %}
+                        <button class="btn-apply" onclick="submitTask({{ item.task.id }})">申请完成</button>
+                    {% elif item.status == 'wait_confirm' %}
+                        <span class="btn-waiting">等待确认</span>
+                    {% elif item.status == 'completed' %}
+                        <span class="btn-completed"><span class="icon icon-check"></span> 已完成</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {% if active_challenges %}
+    <div class="challenge-section">
+        <h2 class="section-title">进行中的挑战</h2>
+        {% for progress in active_challenges %}
+        <div class="challenge-item">
+            <div class="challenge-icon"><span class="icon icon-trophy"></span></div>
+            <div class="challenge-info">
+                <div class="challenge-title">{{ progress.challenge.title }}</div>
+                <div class="challenge-progress">
+                    当前进度: {{ progress.current_value }} / {{ progress.challenge.target_value }}
+                </div>
+                <div class="challenge-bar">
+                    <div class="challenge-bar-fill" style="width: {{ progress.percent }}%"></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if badges %}
+    <div class="badges-section">
+        <h2 class="section-title">我的徽章</h2>
+        <div class="badges-grid">
+            {% for badge in badges %}
+            <div class="badge-item earned" title="{{ badge.badge.name }}">
+                <span class="icon icon-medal"></span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if encouragements %}
+    <div class="encouragement-section">
+        <h2 class="section-title">家长鼓励</h2>
+        <div class="encouragement-list">
+            {% for enc in encouragements %}
+            <div class="encouragement-item" id="enc-{{ enc.id }}">
+                <div class="encouragement-icon"><span class="icon icon-hand"></span></div>
+                <div class="encouragement-text">{{ enc.message }}</div>
+                <div class="encouragement-time">{{ enc.created_at|date:"H:i" }}</div>
+                <button class="encouragement-close" onclick="closeEncouragement({{ enc.id }})">x</button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Meal Upload Modal -->
+<div class="modal-overlay" id="mealModal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-title">AI 膳食识别</div>
+            <button class="modal-close" onclick="closeMealModal()">&times;</button>
+        </div>
+
+        <!-- Upload Options -->
+        <div class="upload-options" id="uploadOptions">
+            <div class="upload-option" onclick="selectPhotoUpload()">
+                <div class="upload-option-icon"><span class="icon icon-image"></span></div>
+                <div class="upload-option-text">从相册选择</div>
+            </div>
+            <div class="upload-option" onclick="startCamera()">
+                <div class="upload-option-icon"><span class="icon icon-camera"></span></div>
+                <div class="upload-option-text">拍照上传</div>
+            </div>
+        </div>
+
+        <!-- Hidden file input -->
+        <input type="file" id="photoInput" accept="image/*" style="display: none;" onchange="handlePhotoSelect(this.files[0])">
+
+        <!-- Camera Preview -->
+        <video id="cameraPreview" autoplay playsinline></video>
+        <canvas id="cameraCanvas" style="display: none;"></canvas>
+        <img id="capturedPhoto" alt="Captured photo">
+
+        <!-- Camera Controls -->
+        <div class="camera-controls" id="cameraControls">
+            <button class="btn-capture" onclick="capturePhoto()">拍照</button>
+        </div>
+
+        <!-- Loading -->
+        <div class="loading-spinner" id="loadingSpinner">
+            <div class="spinner"></div>
+            <div>AI 正在识别食材...</div>
+        </div>
+
+        <!-- Analyze Button -->
+        <div style="text-align: center;">
+            <button class="btn-analyze" id="btnAnalyze" onclick="analyzeMeal()">
+                开始分析
+            </button>
+        </div>
+
+        <!-- Results -->
+        <div class="result-section" id="resultSection">
+            <div class="result-title">识别结果</div>
+
+            <div class="food-list" id="foodList"></div>
+
+            <div class="score-display">
+                <div class="score-value" id="scoreValue">0/5</div>
+                <div class="score-label">五色营养评分</div>
+            </div>
+
+            <div class="gems-display" id="gemsDisplay"></div>
+
+            <div class="bonus-message" id="bonusMessage" style="display: none;"></div>
+
+            <div class="nutrition-grid">
+                <div class="nutrition-item">
+                    <div class="nutrition-value" id="caloriesValue">0</div>
+                    <div class="nutrition-label">热量 (kcal)</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-value" id="proteinValue">0</div>
+                    <div class="nutrition-label">蛋白质 (g)</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-value" id="carbValue">0</div>
+                    <div class="nutrition-label">碳水化合物 (g)</div>
+                </div>
+                <div class="nutrition-item">
+                    <div class="nutrition-value" id="fatValue">0</div>
+                    <div class="nutrition-label">脂肪 (g)</div>
+                </div>
+            </div>
+
+            <button class="btn-apply" onclick="closeMealModal(); location.reload();">完成</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast" style="display: none;"></div>
+
+<script>
+let mediaStream = null;
+let currentImageFile = null;
+
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.style.display = 'block';
+    setTimeout(() => {
+        toast.style.display = 'none';
+    }, 2000);
+}
+
+function submitTask(taskId) {
+    fetch(`/child/submit-task/${taskId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message);
+            location.reload();
+        } else {
+            showToast(data.message);
+        }
+    });
+}
+
+function closeEncouragement(id) {
+    fetch(`/child/encouragement/${id}/read/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(() => {
+        document.getElementById('enc-' + id).style.display = 'none';
+    });
+}
+
+// Modal functions
+function openMealModal() {
+    document.getElementById('mealModal').classList.add('active');
+    resetMealModal();
+}
+
+function closeMealModal() {
+    stopCamera();
+    document.getElementById('mealModal').classList.remove('active');
+}
+
+function resetMealModal() {
+    document.getElementById('uploadOptions').style.display = 'flex';
+    document.getElementById('cameraPreview').style.display = 'none';
+    document.getElementById('capturedPhoto').style.display = 'none';
+    document.getElementById('cameraControls').style.display = 'none';
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('btnAnalyze').style.display = 'none';
+    document.getElementById('resultSection').style.display = 'none';
+    currentImageFile = null;
+}
+
+function selectPhotoUpload() {
+    document.getElementById('photoInput').click();
+}
+
+function handlePhotoSelect(file) {
+    if (!file) return;
+    currentImageFile = file;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = document.getElementById('capturedPhoto');
+        img.src = e.target.result;
+        img.style.display = 'block';
+        document.getElementById('uploadOptions').style.display = 'none';
+        document.getElementById('cameraControls').style.display = 'none';
+        document.getElementById('btnAnalyze').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+async function startCamera() {
+    try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        const video = document.getElementById('cameraPreview');
+        video.srcObject = mediaStream;
+        video.style.display = 'block';
+        document.getElementById('uploadOptions').style.display = 'none';
+        document.getElementById('cameraControls').style.display = 'block';
+        document.getElementById('capturedPhoto').style.display = 'none';
+    } catch (err) {
+        showToast('无法访问摄像头，请检查权限设置');
+        console.error(err);
+    }
+}
+
+function stopCamera() {
+    if (mediaStream) {
+        mediaStream.getTracks().forEach(track => track.stop());
+        mediaStream = null;
+    }
+}
+
+function capturePhoto() {
+    const video = document.getElementById('cameraPreview');
+    const canvas = document.getElementById('cameraCanvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob(blob => {
+        currentImageFile = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+        const img = document.getElementById('capturedPhoto');
+        img.src = URL.createObjectURL(blob);
+        img.style.display = 'block';
+
+        stopCamera();
+        video.style.display = 'none';
+        document.getElementById('cameraControls').style.display = 'none';
+        document.getElementById('btnAnalyze').style.display = 'block';
+    }, 'image/jpeg', 0.9);
+}
+
+function analyzeMeal() {
+    if (!currentImageFile) {
+        showToast('请先上传图片');
+        return;
+    }
+
+    document.getElementById('btnAnalyze').style.display = 'none';
+    document.getElementById('loadingSpinner').style.display = 'block';
+
+    const formData = new FormData();
+    formData.append('meal_type', 'lunch');
+    formData.append('image', currentImageFile);
+
+    fetch('/api/yolo/recognize/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        document.getElementById('loadingSpinner').style.display = 'none';
+
+        if (data.success) {
+            displayResults(data);
+        } else {
+            showToast(data.message || '识别失败，请重试');
+            resetMealModal();
+        }
+    })
+    .catch(err => {
+        document.getElementById('loadingSpinner').style.display = 'none';
+        showToast('上传失败，请重试');
+        resetMealModal();
+    });
+}
+
+function displayResults(data) {
+    document.getElementById('resultSection').style.display = 'block';
+
+    // Food list
+    const foodList = document.getElementById('foodList');
+    foodList.innerHTML = '';
+    data.foods.forEach(food => {
+        const tag = document.createElement('div');
+        tag.className = 'food-tag';
+        tag.textContent = food.name;
+        foodList.appendChild(tag);
+    });
+
+    // Score
+    document.getElementById('scoreValue').textContent = data.score + '/5';
+
+    // Gems
+    const gemsDisplay = document.getElementById('gemsDisplay');
+    gemsDisplay.innerHTML = '';
+    const gemColors = ['red', 'yellow', 'green', 'blue', 'purple'];
+    const gemLabels = ['米', '肉', '菜', '果', '奶'];
+    gemColors.forEach((color, i) => {
+        const gem = document.createElement('div');
+        gem.className = `gem gem-${color} ${data.gems[color] ? 'active' : ''}`;
+        gem.textContent = gemLabels[i];
+        gemsDisplay.appendChild(gem);
+    });
+
+    // Bonus message
+    if (data.five_color_bonus > 0) {
+        document.getElementById('bonusMessage').style.display = 'block';
+        document.getElementById('bonusMessage').textContent = '🎉 五色满分！获得额外 ' + data.five_color_bonus + ' 体力奖励！';
+    } else {
+        document.getElementById('bonusMessage').style.display = 'none';
+    }
+
+    // Nutrition
+    if (data.nutrition) {
+        document.getElementById('caloriesValue').textContent = data.nutrition.calories;
+        document.getElementById('proteinValue').textContent = data.nutrition.protein;
+        document.getElementById('carbValue').textContent = data.nutrition.carbohydrate;
+        document.getElementById('fatValue').textContent = data.nutrition.fat;
+    }
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
