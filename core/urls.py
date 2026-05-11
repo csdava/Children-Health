@@ -9,33 +9,46 @@ urlpatterns = [
     path('logout/', views.user_logout, name='logout'),
     path('setup/', views.admin_setup, name='admin_setup'),
 
-    # 儿童端
+    # 儿童端（建议仅由负责儿童端的同事修改本块）
     path('child/', views.child_dashboard, name='child_dashboard'),
     path('child/register/', views.register_child, name='register_child'),
     path('child/submit-task/<int:task_id>/', views.child_submit_task, name='child_submit_task'),
     path('child/encouragement/<int:encouragement_id>/read/', views.child_mark_encouragement_read, name='child_mark_encouragement_read'),
     path('child/meal-history/', views.child_meal_history, name='child_meal_history'),
+    path('child/alerts/', views.child_health_alerts, name='child_health_alerts'),
+    path('child/alerts/<int:alert_id>/read/', views.child_mark_alert_read, name='child_mark_alert_read'),
     path('child/badges/', views.child_badges, name='child_badges'),
     path('child/update-avatar/', views.child_update_avatar, name='child_update_avatar'),
 
     # YOLO 膳食识别 API (预留接口)
     path('api/yolo/recognize/', views.yolo_recognize_food, name='yolo_recognize_food'),
 
-    # 家长端
+    # 家长端（建议仅由负责家长端的同事修改本块，避免与儿童端/学校端冲突）
     path('parent/', views.parent_dashboard, name='parent_dashboard'),
     path('parent/switch-child/', views.parent_switch_child, name='parent_switch_child'),
     path('parent/confirm-task/<int:record_id>/', views.parent_confirm_task, name='parent_confirm_task'),
     path('parent/add-manual-task/', views.parent_add_manual_task, name='parent_add_manual_task'),
     path('parent/send-encouragement/', views.parent_send_encouragement, name='parent_send_encouragement'),
     path('parent/correct-meal/<int:meal_id>/', views.parent_correct_meal, name='parent_correct_meal'),
+    path('parent/meal/<int:meal_id>/detail/', views.parent_meal_detail, name='parent_meal_detail'),
+    path('parent/food-materials/', views.parent_food_materials, name='parent_food_materials'),
+    path('parent/meal-list/', views.parent_meal_list, name='parent_meal_list'),
+    path('parent/child-diet-notes/', views.parent_child_diet_notes, name='parent_child_diet_notes'),
+    path('parent/child-health-tags/', views.parent_child_health_tags, name='parent_child_health_tags'),
+    path('parent/recommended-intake/', views.parent_child_recommended_intake, name='parent_child_recommended_intake'),
+    path('parent/alerts/', views.parent_health_alerts, name='parent_health_alerts'),
+    path('parent/alerts/<int:alert_id>/read/', views.parent_mark_alert_read, name='parent_mark_alert_read'),
     path('parent/recipes/', views.parent_recipes, name='parent_recipes'),
     path('parent/meal-report/', views.parent_meal_report, name='parent_meal_report'),
+    path('parent/export-weekly-pdf/', views.parent_export_weekly_pdf, name='parent_export_weekly_pdf'),
     path('parent/add-to-class/', views.parent_add_to_class, name='parent_add_to_class'),
     path('parent/get-teachers/', views.parent_get_teachers, name='parent_get_teachers'),
     path('parent/bind-child/', views.parent_bind_child, name='parent_bind_child'),
 
-    # 学校端
+    # 学校端（建议仅由负责学校端的同事修改本块）
     path('school/', views.school_dashboard, name='school_dashboard'),
+    path('school/alerts/', views.school_health_alerts, name='school_health_alerts'),
+    path('school/alerts/<int:alert_id>/read/', views.school_mark_alert_read, name='school_mark_alert_read'),
     path('school/create-activity/', views.school_create_activity, name='school_create_activity'),
     path('school/create-challenge/', views.school_create_challenge, name='school_create_challenge'),
     path('school/class-stats/', views.school_class_stats, name='school_class_stats'),

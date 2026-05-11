@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
 from django.db.models import Count, Q, Sum
@@ -10,7 +10,7 @@ from datetime import timedelta
 from .models import (
     Child, Task, TaskRecord, Encouragement, Teacher, ClassStudent, Activity,
     FoodMaterial, MealRecord, MealFoodItem, Badge, ChildBadge, Recipe,
-    HealthChallenge, ChallengeProgress, School
+    HealthAlert, HealthChallenge, ChallengeProgress, School
 )
 
 
@@ -507,6 +507,48 @@ def yolo_recognize_food(request):
     meal_record.total_score = score
     meal_record.save()
 
+    # ========== 过敏预警（结构化标签）==========
+    allergy_hits = []
+    try:
+        tags = child.allergy_tags or []
+        if not isinstance(tags, list):
+            tags = []
+        food_names = [str(fi.food.name) for fi in meal_record.food_items.all()]
+        for t in tags:
+            t = (str(t) or "").strip()
+            if not t:
+                continue
+            for n in food_names:
+                if t in n:
+                    allergy_hits.append({'tag': t, 'food': n})
+        # 去重
+        seen = set()
+        uniq = []
+        for h in allergy_hits:
+            k = (h['tag'], h['food'])
+            if k not in seen:
+                seen.add(k)
+                uniq.append(h)
+        allergy_hits = uniq
+
+        if allergy_hits:
+            title = "过敏预警"
+            msg = f"识别到可能包含过敏原：{'、'.join(sorted({h['tag'] for h in allergy_hits}))}"
+            HealthAlert.objects.create(
+                child=child,
+                alert_type='allergy',
+                title=title,
+                message=msg,
+                payload={
+                    'meal_id': meal_record.id,
+                    'date': today.isoformat(),
+                    'meal_type': meal_type,
+                    'hits': allergy_hits,
+                },
+            )
+    except Exception:
+        allergy_hits = []
+
     # 检查五色满分奖励
     bonus = 0
     if child.is_five_color_complete():
@@ -531,6 +573,7 @@ def yolo_recognize_food(request):
         },
         'score': score,
         'five_color_bonus': bonus,
+        'allergy_hits': allergy_hits,
         'gems': {
             'red': child.gem_red,
             'yellow': child.gem_yellow,
@@ -566,6 +609,42 @@ def child_meal_history(request):
             'foods': [{'name': f.food.name, 'category': f.food.category} for f in m.food_items.all()]
         } for m in meals]
     })
+
+
+@login_required
+def child_health_alerts(request):
+    """儿童端拉取预警列表。"""
+    child = Child.objects.filter(user=request.user).first()
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    limit = max(1, min(100, int(request.GET.get('limit', 50))))
+    alerts = HealthAlert.objects.filter(child=child).order_by('-created_at')[:limit]
+    return JsonResponse({
+        'success': True,
+        'alerts': [{
+            'id': a.id,
+            'type': a.alert_type,
+            'title': a.title,
+            'message': a.message,
+            'created_at': timezone.localtime(a.created_at).strftime('%Y-%m-%d %H:%M'),
+            'is_read': a.is_read_by_child,
+            'payload': a.payload,
+        } for a in alerts],
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def child_mark_alert_read(request, alert_id):
+    """儿童端标记预警已读。"""
+    child = Child.objects.filter(user=request.user).first()
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+    alert = get_object_or_404(HealthAlert, id=alert_id, child=child)
+    alert.is_read_by_child = True
+    alert.save(update_fields=['is_read_by_child'])
+    return JsonResponse({'success': True})
 
 
 @login_required
@@ -609,6 +688,60 @@ def child_update_avatar(request):
 
 
 # ========== 家长端视图 ==========
+# 本段路由与模板（parent/*、templates/parent/*）由「家长端」负责人维护；
+# 修改时请避免改动儿童端、学校端视图与模板，减少合并冲突。
+
+
+def _meal_five_color_score_from_items(meal):
+    """按本餐食材覆盖的五色大类数量计分（与儿童端单次识别逻辑一致，1–5）。"""
+    cats = set()
+    for item in meal.food_items.all():
+        c = item.food.category
+        if c in ('grain', 'protein', 'vegetable', 'fruit', 'dairy'):
+            cats.add(c)
+    return len(cats)
+
+
+def _parent_resolve_child(request):
+    """当前家长会话中选中的孩子。"""
+    selected_id = request.session.get('selected_child_id')
+    children = Child.objects.filter(parent=request.user)
+    if selected_id:
+        child = children.filter(id=selected_id).first()
+        if not child:
+            child = children.first()
+    else:
+        child = children.first()
+    return child, children
+
+
+def _parent_task_stats_payload(child, upgraded):
+    """家长端局部刷新用的体力与任务统计。"""
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+    child.refresh_from_db()
+    today_completed = TaskRecord.objects.filter(
+        child=child, date=today, status='completed'
+    ).count()
+    week_completed = TaskRecord.objects.filter(
+        child=child, date__gte=week_ago, status='completed'
+    ).count()
+    pending_count = TaskRecord.objects.filter(
+        child=child, date=today, status='pending'
+    ).count()
+    denom = child.power_to_next or 1
+    progress_percent = min(100, int((child.power / denom) * 100))
+    return {
+        'upgraded': upgraded,
+        'new_power': child.power,
+        'new_level': child.level,
+        'power_to_next': child.power_to_next,
+        'today_completed': today_completed,
+        'week_completed': week_completed,
+        'pending_count': pending_count,
+        'progress_percent': progress_percent,
+    }
+
 
 @login_required
 def parent_switch_child(request):
@@ -663,12 +796,21 @@ def parent_dashboard(request):
     ).select_related('task').order_by('-date', '-submitted_at')
 
     encouragements = Encouragement.objects.filter(
-        sender=request.user
-    ).order_by('-created_at')[:3]
+        sender=request.user, child=child
+    ).order_by('-created_at')[:15]
 
-    progress_percent = int((child.power / child.power_to_next) * 100)
+    denom = child.power_to_next or 1
+    progress_percent = min(100, int((child.power / denom) * 100))
 
-    today_meals = MealRecord.objects.filter(child=child, date=today)
+    today_meals = MealRecord.objects.filter(child=child, date=today).prefetch_related('food_items__food')
+
+    today_meal_totals = {'kcal': 0.0, 'protein': 0.0, 'carb': 0.0, 'fat': 0.0, 'count': 0}
+    for m in today_meals:
+        today_meal_totals['kcal'] += float(m.total_calories or 0)
+        today_meal_totals['protein'] += float(m.total_protein or 0)
+        today_meal_totals['carb'] += float(m.total_carbohydrate or 0)
+        today_meal_totals['fat'] += float(m.total_fat or 0)
+        today_meal_totals['count'] += 1
 
     return render(request, 'parent/dashboard.html', {
         'child': child,
@@ -680,6 +822,7 @@ def parent_dashboard(request):
         'encouragements': encouragements,
         'progress_percent': progress_percent,
         'today_meals': today_meals,
+        'today_meal_totals': today_meal_totals,
     })
 
 
@@ -694,6 +837,9 @@ def parent_confirm_task(request, record_id):
     if record.status != 'pending':
         return JsonResponse({'success': False, 'message': '任务状态不允许确认'})
 
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+
     child = record.child
     record.status = 'completed'
     record.confirmed_at = timezone.now()
@@ -707,13 +853,8 @@ def parent_confirm_task(request, record_id):
         message=f"🎉 家长确认了你的任务！+{record.task.power_reward}体力"
     )
 
-    return JsonResponse({
-        'success': True,
-        'message': '确认成功',
-        'upgraded': upgraded,
-        'new_power': child.power,
-        'new_level': child.level
-    })
+    stats = _parent_task_stats_payload(child, upgraded)
+    return JsonResponse({'success': True, 'message': '确认成功', **stats})
 
 
 @login_required
@@ -746,10 +887,11 @@ def parent_add_manual_task(request):
             record.confirmed_at = timezone.now()
             record.save()
             upgraded = child.add_power(task.power_reward)
+            stats = _parent_task_stats_payload(child, upgraded)
             return JsonResponse({
                 'success': True,
                 'message': f'已补充确认 {task.name}，+{task.power_reward}体力',
-                'upgraded': upgraded
+                **stats,
             })
         return JsonResponse({'success': False, 'message': '今日该任务已完成'})
 
@@ -761,10 +903,11 @@ def parent_add_manual_task(request):
         message=f"🎉 家长补充确认了{task.name}！+{task.power_reward}体力"
     )
 
+    stats = _parent_task_stats_payload(child, upgraded)
     return JsonResponse({
         'success': True,
         'message': f'已补充确认 {task.name}，+{task.power_reward}体力',
-        'upgraded': upgraded
+        **stats,
     })
 
 
@@ -772,14 +915,7 @@ def parent_add_manual_task(request):
 @require_http_methods(["POST"])
 def parent_send_encouragement(request):
     """家长发送鼓励语"""
-    selected_id = request.session.get('selected_child_id')
-    children = Child.objects.filter(parent=request.user)
-    if selected_id:
-        child = children.filter(id=selected_id).first()
-        if not child:
-            child = children.first()
-    else:
-        child = children.first()
+    child, _children = _parent_resolve_child(request)
     if not child:
         return JsonResponse({'success': False, 'message': '未找到孩子信息'})
 
@@ -787,27 +923,31 @@ def parent_send_encouragement(request):
     if not message:
         return JsonResponse({'success': False, 'message': '鼓励内容不能为空'})
 
-    Encouragement.objects.create(
+    enc = Encouragement.objects.create(
         sender=request.user,
         child=child,
         message=message
     )
 
-    return JsonResponse({'success': True, 'message': '鼓励语已发送'})
+    return JsonResponse({
+        'success': True,
+        'message': '鼓励语已发送',
+        'encouragement': {
+            'id': enc.id,
+            'message': enc.message,
+            'created_at': timezone.localtime(enc.created_at).strftime('%Y-%m-%d %H:%M'),
+            'is_read': enc.is_read,
+        },
+    })
 
 
 @login_required
 @require_http_methods(["POST"])
 def parent_correct_meal(request, meal_id):
     """家长修正膳食识别结果"""
-    selected_id = request.session.get('selected_child_id')
-    children = Child.objects.filter(parent=request.user)
-    if selected_id:
-        child = children.filter(id=selected_id).first()
-        if not child:
-            child = children.first()
-    else:
-        child = children.first()
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
 
     meal = get_object_or_404(MealRecord, id=meal_id, child=child)
 
@@ -818,13 +958,12 @@ def parent_correct_meal(request, meal_id):
 
     for food_id, weight in zip(food_ids, weights):
         try:
-            food = FoodMaterial.objects.get(id=food_id)
-            MealFoodItem.objects.create(
-                meal_record=meal,
-                food=food,
-                weight=float(weight)
-            )
-        except FoodMaterial.DoesNotExist:
+            food = FoodMaterial.objects.get(id=int(food_id))
+            w = float(weight)
+            if w < 0:
+                w = 0
+            MealFoodItem.objects.create(meal_record=meal, food=food, weight=w)
+        except (FoodMaterial.DoesNotExist, ValueError, TypeError):
             pass
 
     food_items = meal.food_items.all()
@@ -832,12 +971,55 @@ def parent_correct_meal(request, meal_id):
     meal.total_carbohydrate = sum(item.food.carbohydrate * item.weight / 100 for item in food_items)
     meal.total_fat = sum(item.food.fat * item.weight / 100 for item in food_items)
     meal.total_calories = sum(item.food.calories * item.weight / 100 for item in food_items)
+    meal.total_score = _meal_five_color_score_from_items(meal)
     meal.is_verified = True
     meal.save()
+
+    # 过敏预警：家长修正也会触发（避免儿童端识别未命中）
+    allergy_hits = []
+    try:
+        tags = child.allergy_tags or []
+        if not isinstance(tags, list):
+            tags = []
+        food_names = [str(fi.food.name) for fi in meal.food_items.all()]
+        for t in tags:
+            t = (str(t) or "").strip()
+            if not t:
+                continue
+            for n in food_names:
+                if t in n:
+                    allergy_hits.append({'tag': t, 'food': n})
+        seen = set()
+        uniq = []
+        for h in allergy_hits:
+            k = (h['tag'], h['food'])
+            if k not in seen:
+                seen.add(k)
+                uniq.append(h)
+        allergy_hits = uniq
+        if allergy_hits:
+            msg = f"修正后餐次包含可能过敏原：{'、'.join(sorted({h['tag'] for h in allergy_hits}))}"
+            HealthAlert.objects.create(
+                child=child,
+                alert_type='allergy',
+                title="过敏预警",
+                message=msg,
+                payload={
+                    'meal_id': meal.id,
+                    'date': meal.date.isoformat(),
+                    'meal_type': meal.meal_type,
+                    'hits': allergy_hits,
+                    'source': 'parent_correct',
+                },
+            )
+    except Exception:
+        allergy_hits = []
 
     return JsonResponse({
         'success': True,
         'message': '膳食已修正',
+        'total_score': meal.total_score,
+        'allergy_hits': allergy_hits,
         'nutrition': {
             'calories': round(meal.total_calories, 1),
             'protein': round(meal.total_protein, 1),
@@ -848,22 +1030,274 @@ def parent_correct_meal(request, meal_id):
 
 
 @login_required
+@require_http_methods(["GET"])
+def parent_meal_detail(request, meal_id):
+    """单条膳食明细（家长端修正弹窗用）。"""
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    meal = get_object_or_404(
+        MealRecord.objects.prefetch_related('food_items__food'),
+        id=meal_id,
+        child=child,
+    )
+    return JsonResponse({
+        'success': True,
+        'meal': {
+            'id': meal.id,
+            'meal_type': meal.meal_type,
+            'meal_type_display': meal.get_meal_type_display(),
+            'date': meal.date.isoformat(),
+            'image_key': meal.image_key or '',
+            'total_score': meal.total_score,
+            'is_verified': meal.is_verified,
+            'total_calories': round(meal.total_calories, 1),
+            'foods': [{
+                'food_id': item.food_id,
+                'name': item.food.name,
+                'weight': item.weight,
+                'category': item.food.category,
+            } for item in meal.food_items.all()],
+        },
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def parent_food_materials(request):
+    """食材库列表（家长修正膳食时下拉用）。"""
+    foods = FoodMaterial.objects.all().order_by('category', 'name')
+    return JsonResponse({
+        'success': True,
+        'foods': [{'id': f.id, 'name': f.name, 'category': f.category} for f in foods],
+    })
+
+
+@login_required
+@require_http_methods(["GET"])
+def parent_meal_list(request):
+    """按日期分组的膳食列表（家长端历史浏览、修正入口）。"""
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    days = max(1, min(60, int(request.GET.get('days', 14))))
+    end = timezone.now().date()
+    start = end - timedelta(days=days - 1)
+
+    meal_order = {'breakfast': 0, 'lunch': 1, 'dinner': 2, 'snack': 3}
+    meals = (
+        MealRecord.objects.filter(child=child, date__gte=start, date__lte=end)
+        .prefetch_related('food_items__food')
+        .order_by('-date', 'meal_type')
+    )
+
+    by_date = {}
+    for m in meals:
+        key = m.date.isoformat()
+        names = [fi.food.name for fi in m.food_items.all()[:10]]
+        by_date.setdefault(key, []).append({
+            'id': m.id,
+            'meal_type': m.meal_type,
+            'meal_type_display': m.get_meal_type_display(),
+            'total_score': m.total_score,
+            'total_calories': round(m.total_calories or 0, 0),
+            'is_verified': m.is_verified,
+            'food_summary': '、'.join(names) if names else '—',
+        })
+
+    out_days = []
+    for d in sorted(by_date.keys(), reverse=True):
+        rows = sorted(by_date[d], key=lambda x: meal_order.get(x['meal_type'], 9))
+        out_days.append({'date': d, 'meals': rows})
+
+    return JsonResponse({'success': True, 'days': days, 'dates': out_days})
+
+
+@login_required
+@require_http_methods(["POST"])
+def parent_child_diet_notes(request):
+    """保存当前选中孩子的膳食备注（忌口、过敏等）。"""
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    notes = (request.POST.get('diet_notes') or '').strip()
+    if len(notes) > 4000:
+        return JsonResponse({'success': False, 'message': '备注过长，请控制在4000字内'})
+    child.diet_notes = notes
+    child.save(update_fields=['diet_notes'])
+    return JsonResponse({'success': True, 'message': '已保存'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def parent_child_health_tags(request):
+    """保存当前选中孩子的结构化标签（过敏、医嘱）。"""
+    import json
+
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    def _parse_list(key: str):
+        raw = request.POST.get(key, '[]')
+        try:
+            arr = json.loads(raw)
+            if not isinstance(arr, list):
+                return []
+            cleaned = []
+            seen = set()
+            for x in arr:
+                s = (str(x) or '').strip()
+                if not s:
+                    continue
+                if len(s) > 20:
+                    s = s[:20]
+                if s not in seen:
+                    seen.add(s)
+                    cleaned.append(s)
+            return cleaned[:30]
+        except Exception:
+            return []
+
+    allergy_tags = _parse_list('allergy_tags')
+    medical_tags = _parse_list('medical_tags')
+    child.allergy_tags = allergy_tags
+    child.medical_tags = medical_tags
+    child.save(update_fields=['allergy_tags', 'medical_tags'])
+    return JsonResponse({
+        'success': True,
+        'message': '已保存',
+        'allergy_tags': allergy_tags,
+        'medical_tags': medical_tags,
+    })
+
+
+@login_required
+def parent_child_recommended_intake(request):
+    """返回当前选中孩子的年龄与每日建议摄入（参考范围）。"""
+    from .nutrition import recommend_intake_for_age
+
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    age = child.age_years()
+    rec = recommend_intake_for_age(age)
+    return JsonResponse({
+        'success': True,
+        'child': {'id': child.id, 'nickname': child.nickname, 'age_years': age},
+        'recommendation': None if rec is None else {
+            'calories_kcal_min': rec.calories_kcal_min,
+            'calories_kcal_max': rec.calories_kcal_max,
+            'protein_g_min': rec.protein_g_min,
+            'protein_g_max': rec.protein_g_max,
+            'notes': rec.notes,
+        },
+    })
+
+
+@login_required
+def parent_health_alerts(request):
+    """家长端拉取预警列表。"""
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    limit = max(1, min(100, int(request.GET.get('limit', 50))))
+    alerts = HealthAlert.objects.filter(child=child).order_by('-created_at')[:limit]
+    return JsonResponse({
+        'success': True,
+        'alerts': [{
+            'id': a.id,
+            'type': a.alert_type,
+            'title': a.title,
+            'message': a.message,
+            'created_at': timezone.localtime(a.created_at).strftime('%Y-%m-%d %H:%M'),
+            'is_read': a.is_read_by_parent,
+            'payload': a.payload,
+        } for a in alerts],
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def parent_mark_alert_read(request, alert_id):
+    """家长端标记预警已读。"""
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+    alert = get_object_or_404(HealthAlert, id=alert_id, child=child)
+    alert.is_read_by_parent = True
+    alert.save(update_fields=['is_read_by_parent'])
+    return JsonResponse({'success': True})
+
+
+@login_required
 def parent_recipes(request):
-    """智能食谱推荐"""
-    selected_id = request.session.get('selected_child_id')
-    children = Child.objects.filter(parent=request.user)
-    if selected_id:
-        child = children.filter(id=selected_id).first()
-        if not child:
-            child = children.first()
-    else:
-        child = children.first()
+    """智能食谱推荐（支持 target 关键词与 fill_gaps=1 按当日未点亮的五色缺口推荐）。"""
+    child, _children = _parent_resolve_child(request)
+    target_nutrient = (request.GET.get('target') or '').strip()
+    fill_gaps = request.GET.get('fill_gaps') == '1'
 
-    target_nutrient = request.GET.get('target', '')
+    recipes = Recipe.objects.all().order_by('-id')
 
-    recipes = Recipe.objects.all()
+    if fill_gaps and child:
+        q = Q()
+        if not child.gem_red:
+            for kw in ('谷', '主食', '谷物', '杂粮', '米', '面', '薯'):
+                q |= (
+                    Q(target_nutrients__icontains=kw)
+                    | Q(name__icontains=kw)
+                    | Q(description__icontains=kw)
+                    | Q(ingredients__icontains=kw)
+                )
+        if not child.gem_yellow:
+            for kw in ('蛋白', '肉', '鱼', '虾', '豆', '蛋', '鸡', '牛'):
+                q |= (
+                    Q(target_nutrients__icontains=kw)
+                    | Q(name__icontains=kw)
+                    | Q(description__icontains=kw)
+                    | Q(ingredients__icontains=kw)
+                )
+        if not child.gem_green:
+            for kw in ('蔬菜', '菜', '叶', '纤维', '维生素'):
+                q |= (
+                    Q(target_nutrients__icontains=kw)
+                    | Q(name__icontains=kw)
+                    | Q(description__icontains=kw)
+                    | Q(ingredients__icontains=kw)
+                )
+        if not child.gem_blue:
+            for kw in ('水果', '果', '维C', '浆果'):
+                q |= (
+                    Q(target_nutrients__icontains=kw)
+                    | Q(name__icontains=kw)
+                    | Q(description__icontains=kw)
+                    | Q(ingredients__icontains=kw)
+                )
+        if not child.gem_purple:
+            for kw in ('奶', '乳', '钙', '酸奶', '芝士'):
+                q |= (
+                    Q(target_nutrients__icontains=kw)
+                    | Q(name__icontains=kw)
+                    | Q(description__icontains=kw)
+                    | Q(ingredients__icontains=kw)
+                )
+        if q:
+            narrowed = recipes.filter(q).distinct()
+            if narrowed.exists():
+                recipes = narrowed
+
     if target_nutrient:
-        recipes = recipes.filter(target_nutrients__contains=target_nutrient)
+        recipes = recipes.filter(
+            Q(target_nutrients__icontains=target_nutrient)
+            | Q(name__icontains=target_nutrient)
+            | Q(description__icontains=target_nutrient)
+            | Q(ingredients__icontains=target_nutrient)
+        ).distinct()
 
     return JsonResponse({
         'success': True,
@@ -875,7 +1309,9 @@ def parent_recipes(request):
             'steps': r.steps,
             'calories': r.calories,
             'protein': r.protein,
-            'target_nutrients': r.target_nutrients
+            'carbohydrate': r.carbohydrate,
+            'fat': r.fat,
+            'target_nutrients': r.target_nutrients,
         } for r in recipes[:10]]
     })
 
@@ -883,17 +1319,13 @@ def parent_recipes(request):
 @login_required
 def parent_meal_report(request):
     """多维膳食报告"""
-    selected_id = request.session.get('selected_child_id')
-    children = Child.objects.filter(parent=request.user)
-    if selected_id:
-        child = children.filter(id=selected_id).first()
-        if not child:
-            child = children.first()
-    else:
-        child = children.first()
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
 
-    days = int(request.GET.get('days', 7))
-    start_date = timezone.now().date() - timedelta(days=days)
+    days = max(1, min(90, int(request.GET.get('days', 7))))
+    today = timezone.now().date()
+    start_date = today - timedelta(days=days - 1)
 
     meals = MealRecord.objects.filter(
         child=child, date__gte=start_date
@@ -927,6 +1359,90 @@ def parent_meal_report(request):
             'daily_scores': daily_scores
         }
     })
+
+
+@login_required
+def parent_export_weekly_pdf(request):
+    """导出膳食与任务周报 PDF（默认近 7 天，含今天）。"""
+    from urllib.parse import quote
+
+    from .pdf_weekly import build_parent_weekly_pdf
+
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return HttpResponse('未找到孩子信息', status=400, content_type='text/plain; charset=utf-8')
+
+    days = max(1, min(30, int(request.GET.get('days', 7))))
+    today = timezone.now().date()
+    start = today - timedelta(days=days - 1)
+
+    meals = MealRecord.objects.filter(child=child, date__gte=start, date__lte=today)
+    total_calories = float(meals.aggregate(Sum('total_calories'))['total_calories__sum'] or 0)
+    total_protein = float(meals.aggregate(Sum('total_protein'))['total_protein__sum'] or 0)
+    total_carb = float(meals.aggregate(Sum('total_carbohydrate'))['total_carbohydrate__sum'] or 0)
+    total_fat = float(meals.aggregate(Sum('total_fat'))['total_fat__sum'] or 0)
+
+    daily_rows = []
+    score_sum = 0.0
+    for offset in range(days):
+        day = start + timedelta(days=offset)
+        day_meals = list(meals.filter(date=day))
+        cnt = len(day_meals)
+        avg_score = sum(m.total_score for m in day_meals) / max(cnt, 1)
+        score_sum += avg_score
+        day_cals = sum(float(m.total_calories or 0) for m in day_meals)
+        daily_rows.append({
+            'date': day.strftime('%Y-%m-%d'),
+            'meal_count': cnt,
+            'day_calories': day_cals,
+            'avg_score': avg_score,
+        })
+
+    avg_daily_score = score_sum / max(days, 1)
+    task_completed = TaskRecord.objects.filter(
+        child=child, date__gte=start, date__lte=today, status='completed'
+    ).count()
+
+    from .nutrition import recommend_intake_for_age
+    age = child.age_years()
+    rec = recommend_intake_for_age(age)
+
+    gen_at = timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M')
+    ctx = {
+        'title': f'儿童膳食周报（近{days}天）',
+        'child_label': f'孩子：{child.nickname}（{child.get_gender_display()}）',
+        'age_years': age,
+        'period_label': f'统计区间：{start.isoformat()} ～ {today.isoformat()}',
+        'daily_rows': daily_rows,
+        'totals': {
+            'kcal': total_calories,
+            'protein': total_protein,
+            'carb': total_carb,
+            'fat': total_fat,
+        },
+        'avg_daily_score': avg_daily_score,
+        'task_completed_count': task_completed,
+        'allergy_tags': child.allergy_tags if isinstance(child.allergy_tags, list) else [],
+        'medical_tags': child.medical_tags if isinstance(child.medical_tags, list) else [],
+        'intake': None if rec is None else {
+            'calories_kcal_min': rec.calories_kcal_min,
+            'calories_kcal_max': rec.calories_kcal_max,
+            'protein_g_min': rec.protein_g_min,
+            'protein_g_max': rec.protein_g_max,
+            'notes': rec.notes,
+        },
+        'diet_notes': (child.diet_notes or '').strip(),
+        'footer': f'由健康管理家庭端生成 · {gen_at}',
+    }
+
+    pdf_bytes = build_parent_weekly_pdf(ctx)
+    ascii_name = f'weekly_report_{child.id}_{start}_{today}.pdf'
+    display_name = f'膳食周报_{child.nickname}_{start}_{today}.pdf'
+    resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+    resp['Content-Disposition'] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(display_name)}'
+    )
+    return resp
 
 
 @login_required
@@ -973,6 +1489,7 @@ def parent_add_to_class(request):
     return JsonResponse({'success': True, 'message': '已成功添加到班级'})
 
 
+@login_required
 def parent_bind_child(request):
     """家长通过绑定码关联儿童"""
     if request.method != 'POST':
@@ -1063,6 +1580,43 @@ def school_dashboard(request):
         'challenges': challenges,
         'total_tasks': total_tasks,
     })
+
+
+@login_required
+@user_passes_test(is_teacher)
+def school_health_alerts(request):
+    """学校端拉取本班级孩子的预警列表（用于提醒老师）。"""
+    teacher = request.user.teacher_profile
+    limit = max(1, min(200, int(request.GET.get('limit', 100))))
+    child_ids = list(ClassStudent.objects.filter(teacher=teacher).values_list('child_id', flat=True))
+    alerts = HealthAlert.objects.filter(child_id__in=child_ids).order_by('-created_at')[:limit]
+    return JsonResponse({
+        'success': True,
+        'alerts': [{
+            'id': a.id,
+            'child_id': a.child_id,
+            'child_nickname': a.child.nickname,
+            'type': a.alert_type,
+            'title': a.title,
+            'message': a.message,
+            'created_at': timezone.localtime(a.created_at).strftime('%Y-%m-%d %H:%M'),
+            'is_read': a.is_read_by_teacher,
+            'payload': a.payload,
+        } for a in alerts],
+    })
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(["POST"])
+def school_mark_alert_read(request, alert_id):
+    """学校端标记预警已读。"""
+    teacher = request.user.teacher_profile
+    child_ids = list(ClassStudent.objects.filter(teacher=teacher).values_list('child_id', flat=True))
+    alert = get_object_or_404(HealthAlert, id=alert_id, child_id__in=child_ids)
+    alert.is_read_by_teacher = True
+    alert.save(update_fields=['is_read_by_teacher'])
+    return JsonResponse({'success': True})
 
 
 @login_required

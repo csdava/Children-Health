@@ -20,6 +20,10 @@ class Child(models.Model):
     parent = models.ForeignKey(User, on_delete=models.CASCADE, related_name='children', null=True, blank=True, verbose_name='关联家长')
     bind_code = models.CharField(max_length=20, unique=True, null=True, blank=True, verbose_name='绑定码')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    diet_notes = models.TextField(blank=True, verbose_name='膳食备注', help_text='家长填写：忌口、过敏、医嘱摘要等，可选同步到儿童端展示')
+    birth_date = models.DateField(null=True, blank=True, verbose_name='出生日期')
+    allergy_tags = models.JSONField(default=list, blank=True, verbose_name='过敏标签', help_text='家长维护：如“花生”“牛奶”“鸡蛋”等；用于识别与预警')
+    medical_tags = models.JSONField(default=list, blank=True, verbose_name='医嘱标签', help_text='家长维护：如“低盐”“少油”“控糖”等；用于提醒与推荐')
 
     # 五色宝石状态
     gem_red = models.BooleanField(default=False, verbose_name='红色谷物宝石')
@@ -84,6 +88,17 @@ class Child(models.Model):
     def is_five_color_complete(self):
         """检查五色是否全部点亮"""
         return all([self.gem_red, self.gem_yellow, self.gem_green, self.gem_blue, self.gem_purple])
+
+    def age_years(self):
+        """返回近似年龄（周岁），birth_date 为空时返回 None。"""
+        if not self.birth_date:
+            return None
+        from django.utils import timezone
+        today = timezone.now().date()
+        years = today.year - self.birth_date.year
+        if (today.month, today.day) < (self.birth_date.month, self.birth_date.day):
+            years -= 1
+        return max(0, years)
 
 
 class FoodMaterial(models.Model):
@@ -275,6 +290,32 @@ class Encouragement(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} -> {self.child.nickname}: {self.message[:20]}"
+
+
+class HealthAlert(models.Model):
+    """健康预警（用于三端提示：过敏命中、医嘱冲突等）"""
+    ALERT_TYPES = [
+        ('allergy', '过敏预警'),
+        ('medical', '医嘱提醒'),
+    ]
+
+    child = models.ForeignKey(Child, on_delete=models.CASCADE, related_name='health_alerts', verbose_name='孩子')
+    alert_type = models.CharField(max_length=20, choices=ALERT_TYPES, verbose_name='预警类型')
+    title = models.CharField(max_length=100, verbose_name='标题')
+    message = models.TextField(verbose_name='内容')
+    payload = models.JSONField(default=dict, blank=True, verbose_name='结构化数据')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='创建时间')
+    is_read_by_child = models.BooleanField(default=False, verbose_name='儿童端已读')
+    is_read_by_parent = models.BooleanField(default=False, verbose_name='家长端已读')
+    is_read_by_teacher = models.BooleanField(default=False, verbose_name='学校端已读')
+
+    class Meta:
+        verbose_name = '健康预警'
+        verbose_name_plural = '健康预警'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.child.nickname} {self.alert_type}: {self.title}"
 
 
 class Recipe(models.Model):

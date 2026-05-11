@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}家长端 - 健康管理{% endblock %}
+{% block title %}家庭端 · 儿童膳食与习惯{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -341,19 +341,297 @@
 
     .recipe-nutrition {
         display: flex;
-        gap: 15px;
+        flex-wrap: wrap;
+        gap: 10px;
         margin-top: 10px;
         font-size: 12px;
         color: #4CAF50;
+    }
+
+    .meal-card-wrap {
+        text-align: left;
+    }
+
+    .meal-food-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 10px;
+        justify-content: center;
+    }
+
+    .food-tag {
+        font-size: 11px;
+        background: #e8f5e9;
+        color: #2e7d32;
+        padding: 3px 8px;
+        border-radius: 10px;
+    }
+
+    .badge-verified {
+        display: inline-block;
+        font-size: 11px;
+        background: #e3f2fd;
+        color: #1565c0;
+        padding: 2px 8px;
+        border-radius: 8px;
+        margin-top: 6px;
+    }
+
+    .trend-toolbar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+    }
+
+    .trend-toolbar button {
+        padding: 8px 14px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .trend-toolbar button.active {
+        background: #2196F3;
+        color: #fff;
+        border-color: #2196F3;
+    }
+
+    .hist-days-btn {
+        padding: 8px 14px;
+        border: 1px solid #ddd;
+        background: #fff;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .hist-days-btn.active {
+        background: #2196F3;
+        color: #fff;
+        border-color: #2196F3;
+    }
+
+    .trend-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 4px;
+        height: 120px;
+        padding: 10px 0;
+        overflow-x: auto;
+    }
+
+    .trend-bar-col {
+        flex: 0 0 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .trend-bar {
+        width: 100%;
+        background: linear-gradient(180deg, #81c784, #4caf50);
+        border-radius: 4px 4px 0 0;
+        min-height: 4px;
+    }
+
+    .trend-date {
+        font-size: 9px;
+        color: #999;
+        writing-mode: horizontal-tb;
+        transform: rotate(-45deg);
+        white-space: nowrap;
+        height: 28px;
+    }
+
+    details.parent-details {
+        background: white;
+        border-radius: 12px;
+        margin-bottom: 20px;
+        padding: 0 20px 16px;
+    }
+
+    details.parent-details > summary {
+        cursor: pointer;
+        font-weight: bold;
+        padding: 18px 0;
+        list-style: none;
+    }
+
+    details.parent-details > summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .btn-ghost {
+        background: #fff;
+        color: #1976d2;
+        border: 1px solid #90caf9;
+        padding: 6px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .meal-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+        padding: 16px;
+    }
+
+    .meal-modal-overlay.open {
+        display: flex;
+    }
+
+    .meal-modal {
+        background: #fff;
+        border-radius: 16px;
+        max-width: 520px;
+        width: 100%;
+        max-height: 90vh;
+        overflow: auto;
+        padding: 20px;
+    }
+
+    .meal-modal-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 10px;
+        align-items: center;
+    }
+
+    .meal-modal-row select {
+        flex: 1;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+
+    .meal-modal-row input[type="number"] {
+        width: 80px;
+        padding: 8px;
+        border-radius: 8px;
+        border: 1px solid #ddd;
+    }
+
+    .btn-danger-ghost {
+        background: transparent;
+        color: #c62828;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .nav-jump {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .nav-jump a {
+        font-size: 13px;
+        color: #1976d2;
+        text-decoration: none;
+        padding: 6px 12px;
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e0e0e0;
+    }
+
+    .today-snapshot {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-bottom: 16px;
+        padding: 14px;
+        background: #e3f2fd;
+        border-radius: 10px;
+        font-size: 13px;
+        color: #1565c0;
+    }
+
+    .today-snapshot span {
+        margin-right: 8px;
+    }
+
+    .enc-list {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0;
+        max-height: 280px;
+        overflow-y: auto;
+    }
+
+    .enc-list li {
+        padding: 10px 12px;
+        background: #fafafa;
+        border-radius: 8px;
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #333;
+        border-left: 3px solid #2196F3;
+    }
+
+    .enc-list .enc-meta {
+        font-size: 11px;
+        color: #999;
+        margin-top: 6px;
+    }
+
+    .meal-history-table {
+        width: 100%;
+        font-size: 13px;
+        border-collapse: collapse;
+    }
+
+    .meal-history-table th, .meal-history-table td {
+        padding: 8px 6px;
+        border-bottom: 1px solid #eee;
+        text-align: left;
+        vertical-align: top;
+    }
+
+    .meal-history-table th {
+        color: #888;
+        font-weight: 500;
+    }
+
+    .diet-notes-box textarea {
+        width: 100%;
+        min-height: 72px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 14px;
+        resize: vertical;
+        box-sizing: border-box;
     }
 </style>
 {% endblock %}
 
 {% block content %}
+{# 家庭端页面：与儿童端 templates/child/*、学校端 templates/school/* 分工维护，合并代码时注意冲突。#}
 <div class="parent-container">
     <div class="page-header">
-        <h1>家长控制台</h1>
-        <p>管理孩子的健康习惯养成</p>
+        <h1>儿童膳食 · 家庭端</h1>
+        <p>查看与核对当日饮食，跟进习惯任务；食谱会按孩子「五色」缺口优先推荐</p>
+    </div>
+
+    <div class="nav-jump">
+        <a href="#sec-meals">今日膳食</a>
+        <a href="#sec-trend">膳食趋势</a>
+        <a href="#sec-tasks">健康任务</a>
+        <a href="#sec-recipes">食谱</a>
+        <a href="#sec-history">历史膳食</a>
+        <a href="#sec-settings">家庭与班级</a>
     </div>
 
     {% if children|length > 1 %}
@@ -368,66 +646,93 @@
     </div>
     {% endif %}
 
-    <div class="child-overview">
+    <div class="child-overview" id="sec-child">
         <div class="child-avatar">
             {% if child.gender == 'M' %}<span class="icon icon-male"></span>{% else %}<span class="icon icon-female"></span>{% endif %}
         </div>
         <div class="child-stats">
             <div class="child-name">{{ child.nickname }}</div>
-            <div class="child-level"><span class="icon icon-star"></span> Lv.{{ child.level }} 小勇士</div>
+            <div class="child-level" id="dash-level-line"><span class="icon icon-star"></span> Lv.<span id="dash-level">{{ child.level }}</span> 小勇士</div>
             <div class="progress-bar">
-                <div class="progress-fill" style="width: {{ progress_percent }}%"></div>
+                <div class="progress-fill" id="dash-progress-fill" style="width: {{ progress_percent }}%"></div>
             </div>
             <div class="stats-row">
-                <span class="stat-item">体力: {{ child.power }}/{{ child.power_to_next }}</span>
-                <span class="stat-item">本周完成: {{ week_completed }}个任务</span>
-                <span class="stat-item">今日完成: {{ today_completed }}个任务</span>
+                <span class="stat-item">体力: <span id="dash-power">{{ child.power }}</span>/<span id="dash-power-cap">{{ child.power_to_next }}</span></span>
+                <span class="stat-item">本周任务: <span id="dash-week">{{ week_completed }}</span></span>
+                <span class="stat-item">今日任务: <span id="dash-today">{{ today_completed }}</span></span>
+            </div>
+            <div style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #eee;">
+                <div style="font-size: 12px; color: #888; margin-bottom: 8px;">今日五色（与儿童端当日打卡联动，供食谱推荐参考）</div>
+                <div style="display: flex; gap: 10px; justify-content: flex-start; flex-wrap: wrap;">
+                    <div style="text-align: center;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if child.gem_red %}#ff6b6b{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 12px;">谷</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">谷物</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if child.gem_yellow %}#ffd93d{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 12px;">蛋</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">蛋白质</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if child.gem_green %}#6bcb77{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 12px;">菜</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">蔬菜</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if child.gem_blue %}#4dabf7{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 12px;">果</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">水果</div>
+                    </div>
+                    <div style="text-align: center;">
+                        <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if child.gem_purple %}#b19fff{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 12px;">奶</div>
+                        <div style="font-size: 11px; color: #666; margin-top: 4px;">乳制品</div>
+                    </div>
+                </div>
+            </div>
+            <div class="diet-notes-box" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
+                <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;">膳食备注（忌口、过敏、医嘱摘要）</div>
+                <p style="font-size: 12px; color: #888; margin: 0 0 8px;">仅家庭端可编辑；儿童端同事若要在孩子首页展示，可读取模型字段 <code>Child.diet_notes</code>。</p>
+                <textarea id="dietNotesInput" maxlength="4000" placeholder="例如：对花生过敏；晚餐尽量少油…">{{ child.diet_notes }}</textarea>
+                <button type="button" class="btn-add" style="margin-top: 8px;" onclick="saveDietNotes()">保存备注</button>
+                <span id="dietNotesStatus" style="margin-left: 10px; font-size: 13px; color: #666;"></span>
             </div>
         </div>
     </div>
 
-    <div class="section">
-        <h2 class="section-title">五色营养评分</h2>
-        <div style="display: flex; gap: 10px; justify-content: center;">
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if child.gem_red %}#ff6b6b{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto;">米</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">谷物</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if child.gem_yellow %}#ffd93d{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto;">肉</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">蛋白质</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if child.gem_green %}#6bcb77{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto;">菜</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">蔬菜</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if child.gem_blue %}#4dabf7{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto;">果</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">水果</div>
-            </div>
-            <div style="text-align: center;">
-                <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if child.gem_purple %}#b19fff{% else %}#ddd{% endif %}; display: flex; align-items: center; justify-content: center; margin: 0 auto;">奶</div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">乳制品</div>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
+    <div class="section" id="sec-meals">
         <h2 class="section-title">今日膳食</h2>
+        <p style="font-size: 13px; color: #666; margin: -8px 0 14px;">优先核对识别结果，修正后会计入营养与五色评分（本餐）。餐图由儿童端上传后可在数据中查看。</p>
+        {% if today_meal_totals.count %}
+        <div class="today-snapshot">
+            <span><strong>今日累计</strong></span>
+            <span>餐次 {{ today_meal_totals.count }}</span>
+            <span>热量约 {{ today_meal_totals.kcal|floatformat:0 }} kcal</span>
+            <span>蛋白质约 {{ today_meal_totals.protein|floatformat:1 }} g</span>
+            <span>碳水约 {{ today_meal_totals.carb|floatformat:1 }} g</span>
+            <span>脂肪约 {{ today_meal_totals.fat|floatformat:1 }} g</span>
+        </div>
+        {% endif %}
         {% if today_meals %}
         <div class="meal-report">
             {% for meal in today_meals %}
-            <div class="report-card">
+            <div class="report-card meal-card-wrap" id="meal-card-{{ meal.id }}" data-meal-id="{{ meal.id }}">
                 <div style="font-size: 14px; color: #666;">{{ meal.get_meal_type_display }}</div>
-                <div style="font-size: 14px; color: #333; margin-top: 5px;">{{ meal.food_items.count }}种食材</div>
-                <div style="font-size: 24px; font-weight: bold; color: #4CAF50; margin-top: 5px;">
-                    {{ meal.total_score }}/5
+                {% if meal.image_key %}
+                <div style="margin-top: 8px;"><img src="{{ meal.image_key }}" alt="餐图" style="max-width: 100%; max-height: 100px; border-radius: 8px; object-fit: cover;" onerror="this.style.display='none'"></div>
+                {% endif %}
+                <div class="meal-food-tags">
+                    {% for fi in meal.food_items.all %}
+                    <span class="food-tag">{{ fi.food.name }} {{ fi.weight|floatformat:0 }}g</span>
+                    {% empty %}
+                    <span style="font-size: 12px; color: #999;">暂无食材明细</span>
+                    {% endfor %}
                 </div>
-                <div style="font-size: 12px; color: #666; margin-top: 5px;">
-                    {{ meal.total_calories|floatformat:0 }} kcal
+                <div style="font-size: 22px; font-weight: bold; color: #4CAF50; margin-top: 8px;">
+                    <span class="meal-score-val">{{ meal.total_score }}</span>/5
                 </div>
-                <button class="btn-add" style="margin-top: 10px; font-size: 12px; padding: 6px 12px;"
-                        onclick="correctMeal({{ meal.id }})">修正</button>
+                <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                    <span class="meal-kcal-val">{{ meal.total_calories|floatformat:0 }}</span> kcal
+                </div>
+                {% if meal.is_verified %}<span class="badge-verified">已人工核对</span>{% endif %}
+                <button type="button" class="btn-add" style="margin-top: 10px; font-size: 12px; padding: 6px 12px;"
+                        onclick="correctMeal({{ meal.id }})">修正本餐</button>
             </div>
             {% endfor %}
         </div>
@@ -435,72 +740,116 @@
         <div class="empty-state">
             <div class="empty-state-icon"><span class="icon icon-food"></span></div>
             <p>今日暂无膳食记录</p>
-            <p style="font-size: 12px; margin-top: 10px;">等待孩子上传餐食照片</p>
+            <p style="font-size: 12px; margin-top: 10px;">由儿童端拍照上传后，将出现在此处</p>
         </div>
         {% endif %}
     </div>
 
-    <div class="section">
-        <h2 class="section-title">待确认任务</h2>
-        {% if pending_tasks %}
-        <div class="task-list">
-            {% for record in pending_tasks %}
-            <div class="task-item">
-                <div class="task-info">
-                    <div class="task-icon">{{ record.task.icon }}</div>
-                    <div class="task-details">
-                        <h4>{{ record.task.name }}</h4>
-                        <div class="task-time">{{ record.submitted_at|timesince }}前提交</div>
+    <div class="section" id="sec-history">
+        <h2 class="section-title">历史膳食</h2>
+        <p style="font-size: 13px; color: #666; margin: -8px 0 12px;">查看近若干天每餐记录，可随时打开「修正」更新食材（与今日膳食使用同一套修正流程）。</p>
+        <div class="trend-toolbar">
+            <button type="button" class="hist-days-btn active" data-hdays="14" onclick="loadParentMealHistory(14)">近14天</button>
+            <button type="button" class="hist-days-btn" data-hdays="30" onclick="loadParentMealHistory(30)">近30天</button>
+            <button type="button" class="hist-days-btn" data-hdays="7" onclick="loadParentMealHistory(7)">近7天</button>
+        </div>
+        <div id="mealHistoryHost" style="font-size: 13px; color: #555;">加载中…</div>
+    </div>
+
+    <div class="section" id="sec-trend">
+        <h2 class="section-title">膳食趋势</h2>
+        <p style="font-size: 13px; color: #555; margin: -8px 0 12px;">
+            <a href="{% url 'parent_export_weekly_pdf' %}?days=7" class="btn-ghost" style="display:inline-block;text-decoration:none;line-height:1.4" target="_blank" rel="noopener">导出近7天 PDF 周报</a>
+            <a href="{% url 'parent_export_weekly_pdf' %}?days=14" class="btn-ghost" style="display:inline-block;text-decoration:none;line-height:1.4;margin-left:8px" target="_blank" rel="noopener">导出近14天 PDF</a>
+        </p>
+        <div class="trend-toolbar">
+            <span style="font-size: 13px; color: #666;">统计周期</span>
+            <button type="button" class="trend-days-btn active" data-days="7" onclick="loadMealReport(7)">近7天</button>
+            <button type="button" class="trend-days-btn" data-days="14" onclick="loadMealReport(14)">近14天</button>
+            <button type="button" class="trend-days-btn" data-days="30" onclick="loadMealReport(30)">近30天</button>
+        </div>
+        <div id="trendSummary" style="font-size: 13px; color: #555; margin-bottom: 10px;"></div>
+        <div id="trendBars" class="trend-bars"></div>
+    </div>
+
+    <details class="parent-details" id="sec-tasks" {% if pending_tasks %}open{% endif %}>
+        <summary>健康任务（待确认与补充）</summary>
+        <div class="section" style="box-shadow: none; padding: 0; margin: 0;">
+            <h3 class="section-title" style="font-size: 16px;">待确认</h3>
+            <div id="pendingTaskHost">
+                {% if pending_tasks %}
+                <div class="task-list" id="pendingTaskList">
+                    {% for record in pending_tasks %}
+                    <div class="task-item" data-record-id="{{ record.id }}">
+                        <div class="task-info">
+                            <div class="task-icon">{{ record.task.icon }}</div>
+                            <div class="task-details">
+                                <h4>{{ record.task.name }}</h4>
+                                <div class="task-time">{{ record.submitted_at|timesince }}前提交 · 由儿童端提交</div>
+                            </div>
+                        </div>
+                        <button type="button" class="btn-confirm" onclick="confirmTask({{ record.id }}, this)"><span class="icon icon-check"></span> 确认</button>
                     </div>
+                    {% endfor %}
                 </div>
-                <button class="btn-confirm" onclick="confirmTask({{ record.id }})"><span class="icon icon-check"></span> 确认</button>
+                {% else %}
+                <div class="empty-state" id="pendingEmpty">
+                    <div class="empty-state-icon"><span class="icon icon-star-empty"></span></div>
+                    <p>太棒了！暂无待确认任务</p>
+                </div>
+                {% endif %}
             </div>
-            {% endfor %}
         </div>
-        {% else %}
-        <div class="empty-state">
-            <div class="empty-state-icon"><span class="icon icon-star-empty"></span></div>
-            <p>太棒了！暂无待确认任务</p>
+        <div class="section" style="box-shadow: none; padding: 0; margin: 16px 0 0;">
+            <h3 class="section-title" style="font-size: 16px;">手动补充任务</h3>
+            <div class="manual-add">
+                <select id="manualTaskType">
+                    <option value="">请选择任务类型</option>
+                    <option value="veggie">吃够5种蔬菜</option>
+                    <option value="exercise">户外运动30分钟</option>
+                    <option value="sleep">早睡打卡</option>
+                    <option value="wash">洗手20秒</option>
+                </select>
+                <button type="button" class="btn-add" onclick="addManualTask()">直接确认</button>
+            </div>
         </div>
-        {% endif %}
-    </div>
+    </details>
 
-    <div class="section">
-        <h2 class="section-title">手动补充任务</h2>
-        <div class="manual-add">
-            <select id="manualTaskType">
-                <option value="">请选择任务类型</option>
-                <option value="veggie"><span class="icon icon-veg"></span> 吃够5种蔬菜</option>
-                <option value="exercise"><span class="icon icon-run"></span> 户外运动30分钟</option>
-                <option value="sleep"><span class="icon icon-bed"></span> 早睡打卡</option>
-                <option value="wash"><span class="icon icon-drop"></span> 洗手20秒</option>
-            </select>
-            <button class="btn-add" onclick="addManualTask()">直接确认</button>
-        </div>
-    </div>
-
-    <div class="section">
-        <h2 class="section-title">发送鼓励贴纸</h2>
+    <div class="section" id="sec-encourage">
+        <h2 class="section-title">发送鼓励</h2>
+        <p style="font-size: 12px; color: #888; margin: -8px 0 10px;">文案将推送到儿童端「家长鼓励」；下列列表为发给当前孩子 <strong>{{ child.nickname }}</strong> 的最近记录（孩子是否已读见状态）。</p>
         <div class="encouragement-input">
-            <input type="text" id="encouragementMsg" placeholder="输入鼓励语...">
-            <button class="btn-add" onclick="sendEncouragement()">发送</button>
+            <input type="text" id="encouragementMsg" placeholder="输入鼓励语..." maxlength="500">
+            <button type="button" class="btn-add" onclick="sendEncouragement()">发送</button>
         </div>
         <div class="quick-phrases">
-            <button class="quick-phrase" onclick="usePhrase('<span class="icon icon-star"></span>加油小勇士！')"><span class="icon icon-star"></span>加油小勇士！</button>
-            <button class="quick-phrase" onclick="usePhrase('<span class="icon icon-star"></span>太棒啦！继续保持！')"><span class="icon icon-star"></span>太棒啦！</button>
-            <button class="quick-phrase" onclick="usePhrase('<span class="icon icon-plus-circle"></span>你是最棒的！')"><span class="icon icon-plus-circle"></span>你是最棒的！</button>
-            <button class="quick-phrase" onclick="usePhrase('<span class="icon icon-heart"></span>妈妈为你骄傲！')"><span class="icon icon-heart"></span>妈妈为你骄傲！</button>
+            <button type="button" class="quick-phrase" onclick="usePhrase('加油小勇士！')"><span class="icon icon-star"></span> 加油小勇士</button>
+            <button type="button" class="quick-phrase" onclick="usePhrase('太棒啦，继续保持！')"><span class="icon icon-star"></span> 太棒啦</button>
+            <button type="button" class="quick-phrase" onclick="usePhrase('你是最棒的！')"><span class="icon icon-plus-circle"></span> 你最棒</button>
+            <button type="button" class="quick-phrase" onclick="usePhrase('家人为你骄傲！')"><span class="icon icon-heart"></span> 家人骄傲</button>
         </div>
+        <ul class="enc-list" id="encouragementSentList">
+            {% for e in encouragements %}
+            <li data-enc-id="{{ e.id }}">
+                {{ e.message }}
+                <div class="enc-meta">{{ e.created_at|date:"Y-m-d H:i" }} · {% if e.is_read %}孩子已读{% else %}未读{% endif %}</div>
+            </li>
+            {% empty %}
+            <li style="border-left-color:#ccc;color:#999;">暂无记录，发送一条试试吧</li>
+            {% endfor %}
+        </ul>
     </div>
 
-    <div class="section">
+    <div class="section" id="sec-recipes">
         <h2 class="section-title">智能食谱推荐</h2>
-        <div id="recipeList">
-            <div class="empty-state">
-                <p>点击加载食谱</p>
-            </div>
+        <p style="font-size: 13px; color: #666; margin: -8px 0 12px;">默认按当前孩子未点亮的五色类优先推荐；也可手动刷新全部。</p>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+            <button type="button" class="btn-add" onclick="loadRecipes(true)">按缺口推荐</button>
+            <button type="button" class="btn-ghost" onclick="loadRecipes(false)">全部食谱</button>
         </div>
-        <button class="btn-add" style="margin-top: 15px;" onclick="loadRecipes()">加载更多食谱</button>
+        <div id="recipeList">
+            <div class="empty-state"><p>加载中…</p></div>
+        </div>
     </div>
 
     <div class="section">
@@ -521,33 +870,35 @@
         {% endif %}
     </div>
 
-    <div class="section">
-        <h2 class="section-title">绑定儿童</h2>
-        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">输入儿童端提供的绑定码，将孩子绑定到您的账户</p>
-        <div style="display: flex; gap: 10px;">
-            <input type="text" id="bindCodeInput" placeholder="请输入6位绑定码" maxlength="6" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; text-transform: uppercase;">
-            <button class="btn-add" onclick="bindChild()">绑定</button>
+    <details class="parent-details" id="sec-settings">
+        <summary>家庭与班级（绑定码、进班）</summary>
+        <div class="section" style="box-shadow: none; padding: 0; margin: 0;">
+            <h3 class="section-title" style="font-size: 16px;">绑定儿童</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">绑定码由<strong>儿童端同事</strong>生成的账号页面展示；此处仅消费绑定码。</p>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="bindCodeInput" placeholder="请输入6位绑定码" maxlength="6" style="flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; text-transform: uppercase;">
+                <button type="button" class="btn-add" onclick="bindChild()">绑定</button>
+            </div>
+            <div id="bindStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
         </div>
-        <div id="bindStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
-    </div>
-
-    <div class="section">
-        <h2 class="section-title">添加班级</h2>
-        <p style="color: #666; font-size: 14px; margin-bottom: 15px;">将孩子添加到学校班级，与其他孩子一起参与健康挑战</p>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <select id="childSelect" style="flex: 1; min-width: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                <option value="">选择孩子</option>
-                {% for c in children %}
-                <option value="{{ c.id }}">{{ c.nickname }}</option>
-                {% endfor %}
-            </select>
-            <select id="teacherSelect" style="flex: 2; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
-                <option value="">选择教师/班级</option>
-            </select>
-            <button class="btn-add" onclick="addToClass()">添加</button>
+        <div class="section" style="box-shadow: none; padding: 0; margin: 20px 0 0;">
+            <h3 class="section-title" style="font-size: 16px;">添加班级</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">教师与班级数据由<strong>学校端同事</strong>维护；此处选择班级加入。</p>
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <select id="childSelect" style="flex: 1; min-width: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    <option value="">选择孩子</option>
+                    {% for c in children %}
+                    <option value="{{ c.id }}">{{ c.nickname }}</option>
+                    {% endfor %}
+                </select>
+                <select id="teacherSelect" style="flex: 2; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
+                    <option value="">选择教师/班级</option>
+                </select>
+                <button type="button" class="btn-add" onclick="addToClass()">添加</button>
+            </div>
+            <div id="classStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
         </div>
-        <div id="classStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
-    </div>
+    </details>
 </div>
 
 <form method="POST" action="{% url 'parent_switch_child' %}" id="switchChildForm">
@@ -555,14 +906,35 @@
     <input type="hidden" name="child_id" value="{{ child.id }}" id="selectedChildId">
 </form>
 
-<div id="toast" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 8px; display: none;"></div>
+<div id="mealModal" class="meal-modal-overlay" aria-hidden="true">
+    <div class="meal-modal">
+        <h3 style="margin-top: 0;">修正本餐食材</h3>
+        <p id="mealModalSubtitle" style="font-size: 13px; color: #666;"></p>
+        <div id="mealModalRows"></div>
+        <button type="button" class="btn-ghost" onclick="addMealModalRow()">+ 添加一行</button>
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px;">
+            <button type="button" class="btn-ghost" onclick="closeMealModal()">取消</button>
+            <button type="button" class="btn-add" onclick="saveMealCorrect()">保存</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 8px; display: none; z-index: 3000; max-width: 90%; text-align: center;"></div>
 
 <script>
+let cachedFoodOptionsHtml = '';
+let currentCorrectMealId = null;
+
+function escapeHtml(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 function showToast(message) {
     const toast = document.getElementById('toast');
     toast.textContent = message;
     toast.style.display = 'block';
-    setTimeout(() => toast.style.display = 'none', 2000);
+    setTimeout(() => { toast.style.display = 'none'; }, 2500);
 }
 
 function switchChild(childId) {
@@ -570,7 +942,23 @@ function switchChild(childId) {
     document.getElementById('switchChildForm').submit();
 }
 
-function confirmTask(recordId) {
+function applyDashStats(data) {
+    if (!data || data.new_power === undefined) return;
+    const p = document.getElementById('dash-power');
+    const cap = document.getElementById('dash-power-cap');
+    const lvl = document.getElementById('dash-level');
+    const w = document.getElementById('dash-week');
+    const t = document.getElementById('dash-today');
+    const bar = document.getElementById('dash-progress-fill');
+    if (p) p.textContent = data.new_power;
+    if (cap) cap.textContent = data.power_to_next;
+    if (lvl) lvl.textContent = data.new_level;
+    if (w) w.textContent = data.week_completed;
+    if (t) t.textContent = data.today_completed;
+    if (bar) bar.style.width = (data.progress_percent || 0) + '%';
+}
+
+function confirmTask(recordId, btn) {
     fetch(`/parent/confirm-task/${recordId}/`, {
         method: 'POST',
         headers: {'X-CSRFToken': getCookie('csrftoken')}
@@ -578,8 +966,21 @@ function confirmTask(recordId) {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            showToast('确认成功！' + (data.upgraded ? ' <span class="icon icon-star"></span> 孩子升级了！' : ''));
-            location.reload();
+            applyDashStats(data);
+            let msg = '确认成功';
+            if (data.upgraded) msg += '，孩子升级了！';
+            showToast(msg);
+            const row = btn.closest('.task-item');
+            if (row) row.remove();
+            const list = document.getElementById('pendingTaskList');
+            const host = document.getElementById('pendingTaskHost');
+            if (list && list.children.length === 0 && host) {
+                host.innerHTML = '<div class="empty-state" id="pendingEmpty"><div class="empty-state-icon"><span class="icon icon-star-empty"></span></div><p>太棒了！暂无待确认任务</p></div>';
+            }
+            if (data.pending_count === 0) {
+                const det = document.getElementById('sec-tasks');
+                if (det) det.open = false;
+            }
         } else {
             showToast(data.message);
         }
@@ -595,17 +996,21 @@ function addManualTask() {
     fetch('/parent/add-manual-task/', {
         method: 'POST',
         headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `task_code=${taskCode}`
+        body: `task_code=${encodeURIComponent(taskCode)}`
     })
     .then(r => r.json())
     .then(data => {
         showToast(data.message);
-        if (data.success) location.reload();
+        if (data.success) {
+            applyDashStats(data);
+            if (data.upgraded) showToast('孩子升级了！');
+        }
     });
 }
 
 function sendEncouragement() {
-    const msg = document.getElementById('encouragementMsg').value.trim();
+    let msg = document.getElementById('encouragementMsg').value.trim();
+    msg = msg.replace(/<[^>]+>/g, '');
     if (!msg) {
         showToast('请输入鼓励语');
         return;
@@ -618,49 +1023,292 @@ function sendEncouragement() {
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            showToast('鼓励语已发送！');
+            showToast('鼓励语已发送');
             document.getElementById('encouragementMsg').value = '';
+            if (data.encouragement) {
+                prependEncouragementList(data.encouragement);
+            }
         } else {
             showToast(data.message);
         }
     });
 }
 
+function prependEncouragementList(enc) {
+    const ul = document.getElementById('encouragementSentList');
+    if (!ul || !enc) return;
+    const li = document.createElement('li');
+    li.dataset.encId = enc.id;
+    const readLabel = enc.is_read ? '孩子已读' : '未读';
+    li.innerHTML = `${escapeHtml(enc.message)}<div class="enc-meta">${escapeHtml(enc.created_at)} · ${readLabel}</div>`;
+    const first = ul.firstElementChild;
+    if (first && first.textContent.indexOf('暂无记录') !== -1) {
+        first.remove();
+    }
+    ul.insertBefore(li, ul.firstChild);
+    while (ul.children.length > 15) {
+        ul.removeChild(ul.lastElementChild);
+    }
+}
+
+function saveDietNotes() {
+    const notes = document.getElementById('dietNotesInput').value;
+    const st = document.getElementById('dietNotesStatus');
+    fetch('/parent/child-diet-notes/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: 'diet_notes=' + encodeURIComponent(notes)
+    })
+    .then(r => r.json())
+    .then(data => {
+        st.textContent = data.success ? '已保存' : (data.message || '失败');
+        st.style.color = data.success ? '#2e7d32' : '#c62828';
+        setTimeout(() => { st.textContent = ''; }, 2500);
+    })
+    .catch(() => {
+        st.textContent = '网络错误';
+        st.style.color = '#c62828';
+    });
+}
+
+function loadParentMealHistory(days) {
+    document.querySelectorAll('.hist-days-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.hdays, 10) === days);
+    });
+    const host = document.getElementById('mealHistoryHost');
+    host.textContent = '加载中…';
+    fetch('/parent/meal-list/?days=' + days)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.dates || data.dates.length === 0) {
+                host.innerHTML = '<p style="color:#999">该时段暂无膳食记录</p>';
+                return;
+            }
+            let html = '';
+            data.dates.forEach(block => {
+                html += `<div style="margin-bottom:16px"><strong>${escapeHtml(block.date)}</strong><table class="meal-history-table"><thead><tr><th>餐次</th><th>评分</th><th>热量</th><th>食材摘要</th><th></th></tr></thead><tbody>`;
+                block.meals.forEach(m => {
+                    html += `<tr>
+                        <td>${escapeHtml(m.meal_type_display)}</td>
+                        <td>${m.total_score}/5</td>
+                        <td>${m.total_calories} kcal</td>
+                        <td>${escapeHtml(m.food_summary)}</td>
+                        <td><button type="button" class="btn-add" style="padding:4px 10px;font-size:12px" onclick="correctMeal(${m.id})">修正</button></td>
+                    </tr>`;
+                });
+                html += '</tbody></table></div>';
+            });
+            host.innerHTML = html;
+        })
+        .catch(() => { host.textContent = '加载失败'; });
+}
+
 function usePhrase(text) {
     document.getElementById('encouragementMsg').value = text;
 }
 
-function correctMeal(mealId) {
-    showToast('修正功能开发中...');
+function ensureFoodOptions(cb) {
+    if (cachedFoodOptionsHtml) {
+        cb();
+        return;
+    }
+    fetch('/parent/food-materials/')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success || !data.foods) {
+                showToast('加载食材失败');
+                return;
+            }
+            cachedFoodOptionsHtml = data.foods.map(f =>
+                `<option value="${f.id}">${escapeHtml(f.name)} (${escapeHtml(f.category)})</option>`
+            ).join('');
+            cb();
+        })
+        .catch(() => showToast('加载食材失败'));
 }
 
-function loadRecipes() {
-    fetch('/parent/recipes/')
+function correctMeal(mealId) {
+    currentCorrectMealId = mealId;
+    ensureFoodOptions(() => {
+        fetch(`/parent/meal/${mealId}/detail/`)
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success || !data.meal) {
+                    showToast(data.message || '加载失败');
+                    return;
+                }
+                const m = data.meal;
+                document.getElementById('mealModalSubtitle').textContent =
+                    `${m.meal_type_display} · ${m.date} · 共 ${m.foods.length} 条食材`;
+                const box = document.getElementById('mealModalRows');
+                box.innerHTML = '';
+                if (m.foods.length === 0) {
+                    addMealModalRow();
+                } else {
+                    m.foods.forEach(f => addMealModalRow(f.food_id, f.weight));
+                }
+                document.getElementById('mealModal').classList.add('open');
+                document.getElementById('mealModal').setAttribute('aria-hidden', 'false');
+            });
+    });
+}
+
+function addMealModalRow(foodId, weight) {
+    const box = document.getElementById('mealModalRows');
+    const row = document.createElement('div');
+    row.className = 'meal-modal-row';
+    row.innerHTML = `
+        <select class="meal-food-select">${cachedFoodOptionsHtml}</select>
+        <input type="number" class="meal-weight-input" min="0" step="1" value="${weight != null ? weight : 100}" placeholder="克">
+        <button type="button" class="btn-danger-ghost" onclick="this.parentElement.remove()">删除</button>
+    `;
+    box.appendChild(row);
+    if (foodId) {
+        const sel = row.querySelector('.meal-food-select');
+        sel.value = String(foodId);
+    }
+}
+
+function closeMealModal() {
+    document.getElementById('mealModal').classList.remove('open');
+    document.getElementById('mealModal').setAttribute('aria-hidden', 'true');
+    currentCorrectMealId = null;
+}
+
+function saveMealCorrect() {
+    if (!currentCorrectMealId) return;
+    const rows = document.querySelectorAll('#mealModalRows .meal-modal-row');
+    const params = new URLSearchParams();
+    rows.forEach(row => {
+        const fid = row.querySelector('.meal-food-select').value;
+        const w = row.querySelector('.meal-weight-input').value;
+        if (fid) {
+            params.append('food_ids', fid);
+            params.append('weights', w || '0');
+        }
+    });
+    fetch(`/parent/correct-meal/${currentCorrectMealId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params.toString()
+    })
     .then(r => r.json())
     .then(data => {
-        if (data.success && data.recipes.length > 0) {
-            let html = '';
-            data.recipes.forEach(r => {
-                html += `
-                    <div class="recipe-card">
-                        <div class="recipe-title">${r.name}</div>
-                        <div class="recipe-desc">${r.description}</div>
-                        <div class="recipe-nutrition">
-                            <span class="icon icon-star"></span> ${r.calories} kcal</span>
-                            <span>蛋白质 ${r.protein}g</span>
-                            <span>碳水 ${r.carbohydrate}g</span>
-                        </div>
-                    </div>
-                `;
-            });
-            document.getElementById('recipeList').innerHTML = html;
+        if (data.success) {
+            showToast(data.message);
+            const card = document.getElementById('meal-card-' + currentCorrectMealId);
+            if (card) {
+                const sv = card.querySelector('.meal-score-val');
+                const kv = card.querySelector('.meal-kcal-val');
+                if (sv) sv.textContent = data.total_score;
+                if (kv) kv.textContent = Math.round(data.nutrition.calories);
+                let tags = card.querySelector('.meal-food-tags');
+                if (tags) {
+                    const selects = document.querySelectorAll('#mealModalRows .meal-food-select');
+                    const weights = document.querySelectorAll('#mealModalRows .meal-weight-input');
+                    const parts = [];
+                    selects.forEach((sel, i) => {
+                        const opt = sel.options[sel.selectedIndex];
+                        if (opt && opt.value) {
+                            parts.push(`<span class="food-tag">${escapeHtml(opt.text.split(' (')[0])} ${escapeHtml(weights[i].value)}g</span>`);
+                        }
+                    });
+                    tags.innerHTML = parts.length ? parts.join('') : '<span style="font-size: 12px; color: #999;">暂无食材明细</span>';
+                }
+                if (!card.querySelector('.badge-verified')) {
+                    const b = document.createElement('span');
+                    b.className = 'badge-verified';
+                    b.textContent = '已人工核对';
+                    const btn = card.querySelector('button');
+                    if (btn) card.insertBefore(b, btn);
+                }
+            }
+            const hb = document.querySelector('.hist-days-btn.active');
+            if (hb) loadParentMealHistory(parseInt(hb.dataset.hdays, 10));
+            closeMealModal();
         } else {
-            showToast('暂无食谱');
+            showToast(data.message || '保存失败');
         }
     });
 }
 
-// 加载教师列表
+document.getElementById('mealModal').addEventListener('click', function(ev) {
+    if (ev.target === this) closeMealModal();
+});
+
+function loadRecipes(useGaps) {
+    let url = '/parent/recipes/';
+    if (useGaps) url += '?fill_gaps=1';
+    fetch(url)
+    .then(r => r.json())
+    .then(data => {
+        const el = document.getElementById('recipeList');
+        if (!data.success || !data.recipes || data.recipes.length === 0) {
+            el.innerHTML = '<div class="empty-state"><p>暂无食谱数据（可由管理员在后台录入）</p></div>';
+            if (!data.recipes || data.recipes.length === 0) showToast('暂无食谱');
+            return;
+        }
+        window.__parentRecipeCache = data.recipes;
+        let html = '';
+        data.recipes.forEach(r => {
+            html += `
+                <div class="recipe-card">
+                    <div class="recipe-title">${escapeHtml(r.name)}</div>
+                    <div class="recipe-desc">${escapeHtml(r.description || '')}</div>
+                    <div class="recipe-nutrition">
+                        <span>${Number(r.calories).toFixed(0)} kcal</span>
+                        <span>蛋白质 ${Number(r.protein).toFixed(1)}g</span>
+                        <span>碳水 ${Number(r.carbohydrate).toFixed(1)}g</span>
+                        <span>脂肪 ${Number(r.fat).toFixed(1)}g</span>
+                    </div>
+                    <button type="button" class="btn-ghost copy-recipe-btn" style="margin-top:8px" data-rid="${r.id}">复制食材清单</button>
+                </div>
+            `;
+        });
+        el.innerHTML = html;
+    })
+    .catch(() => showToast('食谱加载失败'));
+}
+
+function loadMealReport(days) {
+    document.querySelectorAll('.trend-days-btn').forEach(b => {
+        b.classList.toggle('active', parseInt(b.dataset.days, 10) === days);
+    });
+    fetch(`/parent/meal-report/?days=${days}`)
+        .then(r => r.json())
+        .then(data => {
+            const sum = document.getElementById('trendSummary');
+            const bars = document.getElementById('trendBars');
+            if (!data.success || !data.report) {
+                sum.textContent = '暂无数据';
+                bars.innerHTML = '';
+                return;
+            }
+            const rep = data.report;
+            const daysN = rep.daily_scores.length || 1;
+            const avgKcal = rep.total_calories / daysN;
+            sum.textContent =
+                `${rep.period} 累计热量约 ${Math.round(rep.total_calories)} kcal，` +
+                `日均约 ${avgKcal.toFixed(0)} kcal；` +
+                `日均五色分 ${rep.avg_daily_score}；蛋白累计 ${rep.total_protein.toFixed(0)}g`;
+            let bh = '';
+            let maxS = 5;
+            rep.daily_scores.forEach(d => {
+                const h = Math.max(4, Math.round((d.score / maxS) * 100));
+                const md = d.date.slice(5);
+                bh += `<div class="trend-bar-col"><div class="trend-bar" style="height:${h}px" title="${d.date} 分${d.score} 餐${d.meal_count}"></div><span class="trend-date">${md}</span></div>`;
+            });
+            bars.innerHTML = bh || '<span style="color:#999;font-size:13px">该时段无餐次记录</span>';
+        })
+        .catch(() => showToast('报告加载失败'));
+}
+
 function loadTeachers() {
     fetch('/parent/get-teachers/')
     .then(r => r.json())
@@ -668,7 +1316,7 @@ function loadTeachers() {
         if (data.success && data.teachers.length > 0) {
             let html = '<option value="">选择教师/班级</option>';
             data.teachers.forEach(t => {
-                html += `<option value="${t.id}">${t.name} - ${t.school.name} - ${t.class_name}</option>`;
+                html += `<option value="${t.id}">${escapeHtml(t.name)} - ${escapeHtml(t.school)} - ${escapeHtml(t.class_name)}</option>`;
             });
             document.getElementById('teacherSelect').innerHTML = html;
         }
@@ -696,15 +1344,13 @@ function bindChild() {
         if (data.success) {
             document.getElementById('bindStatus').innerHTML = '<span style="color: #4CAF50;">绑定成功！</span>';
             document.getElementById('bindCodeInput').value = '';
-            // 刷新页面以显示新绑定的儿童
-            setTimeout(() => location.reload(), 1500);
+            setTimeout(() => location.reload(), 1200);
         } else {
-            document.getElementById('bindStatus').innerHTML = '<span style="color: #f44336;">' + data.message + '</span>';
+            document.getElementById('bindStatus').innerHTML = '<span style="color: #f44336;">' + escapeHtml(data.message) + '</span>';
         }
     });
 }
 
-// 添加到班级
 function addToClass() {
     const childId = document.getElementById('childSelect').value;
     const teacherId = document.getElementById('teacherSelect').value;
@@ -715,7 +1361,7 @@ function addToClass() {
     fetch('/parent/add-to-class/', {
         method: 'POST',
         headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `child_id=${childId}&teacher_id=${teacherId}`
+        body: `child_id=${encodeURIComponent(childId)}&teacher_id=${encodeURIComponent(teacherId)}`
     })
     .then(r => r.json())
     .then(data => {
@@ -726,8 +1372,24 @@ function addToClass() {
     });
 }
 
-// 页面加载时获取教师列表
-document.addEventListener('DOMContentLoaded', loadTeachers);
+document.addEventListener('DOMContentLoaded', function() {
+    loadTeachers();
+    loadMealReport(7);
+    loadParentMealHistory(14);
+    loadRecipes(true);
+    document.getElementById('recipeList').addEventListener('click', function(ev) {
+        const btn = ev.target.closest('.copy-recipe-btn');
+        if (!btn) return;
+        const id = parseInt(btn.getAttribute('data-rid'), 10);
+        const r = (window.__parentRecipeCache || []).find(x => x.id === id);
+        const text = (r && r.ingredients) ? r.ingredients : '';
+        if (!text) {
+            showToast('无食材文本');
+            return;
+        }
+        navigator.clipboard.writeText(text).then(() => showToast('已复制到剪贴板')).catch(() => showToast('复制失败，请手动选择'));
+    });
+});
 
 function getCookie(name) {
     let cookieValue = null;
