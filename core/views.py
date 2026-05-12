@@ -1000,6 +1000,61 @@ def parent_bind_child(request):
 
 
 # ========== 健康数据 API（供Android App调用）==========
+
+@login_required
+@require_http_methods(["POST"])
+def health_manual_input(request):
+    """手动录入健康数据（儿童端）"""
+    child = Child.objects.filter(user=request.user).first()
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    try:
+        import json
+        data = json.loads(request.body)
+
+        today = timezone.now().date()
+
+        health_data, created = HealthData.objects.get_or_create(
+            child=child,
+            date=today,
+            defaults={
+                'steps': data.get('steps', 0),
+                'step_goal': data.get('step_goal', 8000),
+                'active_minutes': data.get('active_minutes', 0),
+                'calories_burned': data.get('calories_burned', 0),
+                'heart_rate_avg': data.get('heart_rate_avg', 0),
+                'heart_rate_max': data.get('heart_rate_max', 0),
+                'heart_rate_min': data.get('heart_rate_min', 0),
+                'sleep_duration_minutes': data.get('sleep_duration_minutes', 0),
+                'deep_sleep_minutes': data.get('deep_sleep_minutes', 0),
+                'light_sleep_minutes': data.get('light_sleep_minutes', 0),
+                'rem_sleep_minutes': data.get('rem_sleep_minutes', 0),
+            }
+        )
+
+        if not created:
+            health_data.steps = data.get('steps', health_data.steps)
+            health_data.step_goal = data.get('step_goal', health_data.step_goal)
+            health_data.active_minutes = data.get('active_minutes', health_data.active_minutes)
+            health_data.calories_burned = data.get('calories_burned', health_data.calories_burned)
+            health_data.heart_rate_avg = data.get('heart_rate_avg', health_data.heart_rate_avg)
+            health_data.heart_rate_max = data.get('heart_rate_max', health_data.heart_rate_max)
+            health_data.heart_rate_min = data.get('heart_rate_min', health_data.heart_rate_min)
+            health_data.sleep_duration_minutes = data.get('sleep_duration_minutes', health_data.sleep_duration_minutes)
+            health_data.deep_sleep_minutes = data.get('deep_sleep_minutes', health_data.deep_sleep_minutes)
+            health_data.light_sleep_minutes = data.get('light_sleep_minutes', health_data.light_sleep_minutes)
+            health_data.rem_sleep_minutes = data.get('rem_sleep_minutes', health_data.rem_sleep_minutes)
+            health_data.save()
+
+        return JsonResponse({'success': True, 'message': '数据已保存'})
+
+    except json.JSONDecodeError:
+        return JsonResponse({'success': False, 'message': '无效的JSON数据'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
 @login_required
 @require_http_methods(["POST"])
 def health_sync(request):

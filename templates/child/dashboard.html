@@ -932,6 +932,11 @@
                 <p style="color: #999;">正在加载健康数据...</p>
             </div>
         </div>
+        <div style="text-align: center; margin-top: 15px;">
+            <button onclick="openHealthModal()" style="background: linear-gradient(135deg, #2196F3, #1976D2); color: white; padding: 12px 24px; border: none; border-radius: 8px; font-size: 14px; cursor: pointer;">
+                📱 输入手环数据
+            </button>
+        </div>
     </div>
 
     <div class="meal-section">
@@ -1117,6 +1122,56 @@
 </div>
 
 <div id="toast" class="toast" style="display: none;"></div>
+
+<!-- 健康数据录入弹窗 -->
+<div id="healthModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 20px; padding: 30px; max-width: 400px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <h3 style="color: #333; margin-bottom: 20px;">📱 录入手环数据</h3>
+        <p style="font-size: 12px; color: #999; margin-bottom: 15px;">打开小米运动健康App，查看今日数据后填写</p>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">🏃 步数</label>
+            <input type="number" id="healthSteps" placeholder="今日步数" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">❤️ 平均心率 (bpm)</label>
+            <input type="number" id="healthHeartRate" placeholder="如：72" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">最高心率</label>
+                <input type="number" id="healthHeartRateMax" placeholder="如：120" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">最低心率</label>
+                <input type="number" id="healthHeartRateMin" placeholder="如：55" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+            </div>
+        </div>
+
+        <div style="margin-bottom: 15px;">
+            <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">😴 睡眠时长 (小时)</label>
+            <input type="number" id="healthSleepHours" placeholder="如：8" min="0" max="24" step="0.5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <div style="flex: 1;">
+                <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">深睡 (小时)</label>
+                <input type="number" id="healthDeepSleep" placeholder="如：2" min="0" step="0.5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 14px; color: #666; display: block; margin-bottom: 5px;">浅睡 (小时)</label>
+                <input type="number" id="healthLightSleep" placeholder="如：5" min="0" step="0.5" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; box-sizing: border-box;">
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+            <button onclick="closeHealthModal()" style="padding: 12px 24px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; font-size: 14px;">取消</button>
+            <button onclick="submitHealthData()" style="padding: 12px 24px; border: none; border-radius: 8px; background: #4CAF50; color: white; cursor: pointer; font-size: 14px;">保存</button>
+        </div>
+    </div>
+</div>
 
 <!-- 头像选择Modal -->
 <div id="avatarModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center;">
@@ -1424,6 +1479,63 @@ function displayResults(data) {
         document.getElementById('carbValue').textContent = data.nutrition.carbohydrate;
         document.getElementById('fatValue').textContent = data.nutrition.fat;
     }
+}
+
+// 健康数据录入弹窗
+function openHealthModal() {
+    document.getElementById('healthModal').style.display = 'flex';
+}
+
+function closeHealthModal() {
+    document.getElementById('healthModal').style.display = 'none';
+}
+
+function submitHealthData() {
+    const steps = document.getElementById('healthSteps').value;
+    const heartRateAvg = document.getElementById('healthHeartRate').value;
+    const heartRateMax = document.getElementById('healthHeartRateMax').value;
+    const heartRateMin = document.getElementById('healthHeartRateMin').value;
+    const sleepHours = document.getElementById('healthSleepHours').value;
+    const deepSleep = document.getElementById('healthDeepSleep').value;
+    const lightSleep = document.getElementById('healthLightSleep').value;
+
+    if (!steps && !heartRateAvg && !sleepHours) {
+        showToast('请至少填写一项数据');
+        return;
+    }
+
+    const data = {
+        steps: parseInt(steps) || 0,
+        heart_rate_avg: parseInt(heartRateAvg) || 0,
+        heart_rate_max: parseInt(heartRateMax) || 0,
+        heart_rate_min: parseInt(heartRateMin) || 0,
+        sleep_duration_minutes: Math.round((parseFloat(sleepHours) || 0) * 60),
+        deep_sleep_minutes: Math.round((parseFloat(deepSleep) || 0) * 60),
+        light_sleep_minutes: Math.round((parseFloat(lightSleep) || 0) * 60),
+        step_goal: 8000
+    };
+
+    fetch('/api/health/manual-input/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showToast('数据已保存！');
+            closeHealthModal();
+            loadHealthData();  // 刷新显示
+        } else {
+            showToast(res.message || '保存失败');
+        }
+    })
+    .catch(err => {
+        showToast('保存失败，请重试');
+    });
 }
 
 // 健康数据相关
