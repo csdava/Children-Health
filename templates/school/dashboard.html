@@ -82,9 +82,14 @@
 .btn-outline { background: white; border: 1px solid #ce93d8; color: #7B1FA2; }
 .btn-sm { padding: 6px 12px; font-size: 12px; }
 .btn-danger-outline { border: 1px solid #ef5350; color: #c62828; background: #fff; }
-.student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
+.student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
 .student-item {
     background: #f8f9fa; border-radius: 12px; padding: 14px; text-align: center;
+}
+.student-weekly-export { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #ddd; }
+.student-weekly-export a {
+    display: block; text-align: center; text-decoration: none; box-sizing: border-box;
+    width: 100%;
 }
 .student-avatar {
     width: 44px; height: 44px; border-radius: 50%;
@@ -134,6 +139,7 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
 
 <div class="hint-box">
     排行与预警均以匿名令牌展示学生身份，不外显姓名；营养素与膳食数据来源于家庭端打卡记录，仅作群体统计与教育工作参考。
+    班级名册中展示的<strong>参考摄入、过敏与医嘱标签</strong>由家长在家庭端维护，与儿童端只读展示<strong>同源</strong>，学校端仅查看、不提供修改入口。
     打开本页时会自动把进行中的挑战进度同步到儿童端「挑战」模块；发布活动 / 首次推送微课会通过「鼓励语」推送到本班学生家长与孩子首页。
     {% if school_peer_teachers %}
     本校另有 {{ school_peer_teachers|length }} 个班级账号；校级挑战发起后，统计范围覆盖本校所有在读班级（以系统内绑定为准）。
@@ -451,14 +457,43 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
 
 <div id="tab-students" style="display:none;">
     <div class="card">
-        <div class="card-header"><div class="card-title">班级学生（教师管理可见）</div></div>
+        <div class="card-header">
+            <div>
+                <div class="card-title">班级学生（教师管理可见）</div>
+                <div style="font-size:12px;color:#888;font-weight:400;margin-top:4px;">每名学生在下方卡片内可下载「健康周报」PDF（与家长端同口径）</div>
+            </div>
+        </div>
         <div class="card-body">
             <div class="student-grid">
                 {% for student in students_data %}
-                <div class="student-item">
+                <div class="student-item" style="text-align:left;">
+                    <div style="text-align:center;">
                     <div class="student-avatar">{{ student.nickname|slice:":1" }}</div>
                     <div style="font-weight:500;">{{ student.nickname }}</div>
                     <div style="font-size:12px;color:#888;">Lv.{{ student.level }} · 周完成任务 {{ student.week_tasks }}</div>
+                    </div>
+                    <div class="student-weekly-export">
+                        <div style="font-size:11px;color:#5e35b1;font-weight:600;margin-bottom:8px;text-align:center;">健康周报 PDF</div>
+                        <div style="display:flex;flex-direction:column;gap:6px;">
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=7" class="btn btn-sm btn-primary" target="_blank" rel="noopener">下载近 7 天</a>
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=14" class="btn btn-sm btn-outline" target="_blank" rel="noopener">下载近 14 天</a>
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=30" class="btn btn-sm btn-outline" target="_blank" rel="noopener">下载近 30 天</a>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:#666;margin-top:10px;padding-top:8px;border-top:1px solid #eee;line-height:1.5;">
+                        {% if student.age_years is not None %}约 <strong>{{ student.age_years }}</strong> 周岁 · {% endif %}
+                        {% if student.intake_recommendation %}
+                        参考摄入（非医疗）：热量 {{ student.intake_recommendation.calories_kcal_min }}–{{ student.intake_recommendation.calories_kcal_max }} kcal/日，蛋白 {{ student.intake_recommendation.protein_g_min }}–{{ student.intake_recommendation.protein_g_max }} g/日。
+                        {% else %}
+                        参考摄入需家长在家庭端填写<strong>出生日期</strong>后显示。
+                        {% endif %}
+                    </div>
+                    {% if student.allergy_tags %}
+                    <div style="font-size:11px;color:#b71c1c;margin-top:6px;"><strong>过敏</strong>：{% for t in student.allergy_tags %}{{ t }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
+                    {% endif %}
+                    {% if student.medical_tags %}
+                    <div style="font-size:11px;color:#1565c0;margin-top:4px;"><strong>医嘱/原则</strong>：{% for t in student.medical_tags %}{{ t }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
+                    {% endif %}
                 </div>
                 {% empty %}
                 <div class="empty-state" style="grid-column:1/-1;">暂无学生</div>

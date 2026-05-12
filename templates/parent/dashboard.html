@@ -656,6 +656,46 @@
         resize: vertical;
         box-sizing: border-box;
     }
+
+    .trend-charts-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-bottom: 16px;
+    }
+
+    .trend-chart-card {
+        background: #fff;
+        border: 1px solid #e8e8e8;
+        border-radius: 12px;
+        padding: 12px;
+    }
+
+    .trend-chart-card .trend-chart-canvas-wrap {
+        position: relative;
+        height: 220px;
+        margin-top: 8px;
+    }
+
+    .trend-chart-sleep-wrap {
+        background: #fff;
+        border: 1px solid #e8e8e8;
+        border-radius: 12px;
+        padding: 12px;
+        margin-bottom: 16px;
+    }
+
+    .trend-chart-sleep-wrap .trend-chart-canvas-wrap {
+        position: relative;
+        height: 200px;
+        margin-top: 8px;
+    }
+
+    @media (max-width: 720px) {
+        .trend-charts-grid {
+            grid-template-columns: 1fr;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -668,8 +708,9 @@
     </div>
 
     <div class="nav-jump">
+        <a href="#sec-alerts">健康预警{% if parent_alerts_unread %} <span style="background:#c62828;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;">{{ parent_alerts_unread }}</span>{% endif %}</a>
         <a href="#sec-meals">今日膳食</a>
-        <a href="#sec-trend">膳食趋势</a>
+        <a href="#sec-trend">健康趋势</a>
         <a href="#sec-tasks">健康任务</a>
         <a href="#sec-recipes">食谱</a>
         <a href="#sec-history">历史膳食</a>
@@ -697,6 +738,12 @@
             <div class="stat-item" id="childAgeLine" style="margin-top:6px;">
                 {% if child_age_years is not None %}周岁 <strong id="childAgeYears">{{ child_age_years }}</strong> 岁 · 出生日期由家庭端维护{% else %}尚未填写出生日期 · 用于推荐摄入与周报{% endif %}
             </div>
+            {% if intake_recommendation %}
+            <div style="font-size:13px;color:#33691e;margin-top:10px;padding:12px;background:#f1f8e9;border-radius:10px;border:1px solid #c5e1a5;line-height:1.5;">
+                <strong>每日参考摄入</strong>（与儿童端/学校端展示口径一致，非医疗诊断）：热量约 {{ intake_recommendation.calories_kcal_min }}–{{ intake_recommendation.calories_kcal_max }} kcal，
+                蛋白质约 {{ intake_recommendation.protein_g_min }}–{{ intake_recommendation.protein_g_max }} g。{{ intake_recommendation.notes }}
+            </div>
+            {% endif %}
             <div class="child-level" id="dash-level-line"><span class="icon icon-star"></span> Lv.<span id="dash-level">{{ child.level }}</span> 小勇士</div>
             <div class="progress-bar">
                 <div class="progress-fill" id="dash-progress-fill" style="width: {{ progress_percent }}%"></div>
@@ -747,7 +794,46 @@
                 <button type="button" class="btn-add" style="margin-top: 8px;" onclick="saveDietNotes()">保存备注</button>
                 <span id="dietNotesStatus" style="margin-left: 10px; font-size: 13px; color: #666;"></span>
             </div>
+            <div class="diet-notes-box" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #eee;">
+                <div style="font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px;">过敏与医嘱标签（与识别预警、学校端只读展示对齐）</div>
+                <p style="font-size: 12px; color: #888; margin: 0 0 8px;">多条请用中文或英文逗号分隔，例如：<code>花生,牛奶</code>、<code>少油,控糖</code>。保存后儿童端餐食识别会用于过敏预警。</p>
+                <label style="font-size:12px;color:#666;">过敏</label>
+                <input type="text" id="allergyTagsInput" maxlength="500" placeholder="如：花生,鸡蛋" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;margin:6px 0 12px;font-size:14px;"
+                    value="{% for t in child.allergy_tags %}{{ t }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                <label style="font-size:12px;color:#666;">医嘱 / 饮食原则</label>
+                <input type="text" id="medicalTagsInput" maxlength="500" placeholder="如：少油,控糖" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;margin:6px 0 8px;font-size:14px;"
+                    value="{% for t in child.medical_tags %}{{ t }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                <button type="button" class="btn-add" onclick="saveHealthTags()">保存标签</button>
+                <span id="healthTagsStatus" style="margin-left: 10px; font-size: 13px; color: #666;"></span>
+            </div>
         </div>
+    </div>
+
+    <div class="section" id="sec-alerts">
+        <h2 class="section-title">健康预警</h2>
+        <p style="font-size: 13px; color: #666; margin: -8px 0 14px;">与儿童端、学校端共用数据：餐图识别或家长修正膳食命中过敏标签时会产生记录；与学校端「班级预警」同源。</p>
+        {% if parent_health_alerts %}
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+            {% for a in parent_health_alerts %}
+            <div class="alert-card-parent" data-alert-id="{{ a.id }}" style="padding:14px;border-radius:10px;border-left:4px solid {% if a.alert_type == 'allergy' %}#c62828{% else %}#1565c0{% endif %};background:{% if a.is_read_by_parent %}#fafafa{% else %}#fff8f8{% endif %};">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+                    <div>
+                        <div style="font-size:14px;font-weight:600;color:#333;">{{ a.title }}</div>
+                        <div style="font-size:12px;color:#888;margin-top:4px;">{{ a.created_at|date:"Y-m-d H:i" }} · {% if a.alert_type == 'allergy' %}过敏{% else %}医嘱{% endif %}</div>
+                        <div style="font-size:14px;color:#444;margin-top:8px;line-height:1.5;">{{ a.message }}</div>
+                    </div>
+                    {% if not a.is_read_by_parent %}
+                    <button type="button" class="btn-ghost" style="white-space:nowrap;" onclick="markParentAlertRead({{ a.id }})">标记已读</button>
+                    {% else %}
+                    <span style="font-size:12px;color:#999;">已读</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:#999;font-size:14px;">暂无预警记录。</p>
+        {% endif %}
     </div>
 
     <!-- 健康数据区域（Android 手环同步） -->
@@ -822,9 +908,10 @@
     </div>
 
     <div class="section" id="sec-trend">
-        <h2 class="section-title">膳食趋势</h2>
+        <h2 class="section-title">健康数据趋势</h2>
         <p style="font-size: 13px; color: #555; margin: -8px 0 12px;">
-            <a href="{% url 'parent_export_weekly_pdf' %}?days=7" class="btn-ghost" style="display:inline-block;text-decoration:none;line-height:1.4" target="_blank" rel="noopener">导出近7天 PDF 周报</a>
+            下图汇总<strong>膳食热量与五色分</strong>、<strong>每日已确认任务次数</strong>及<strong>手环步数</strong>（有数据才连线）。导出 PDF 为「健康周报」，含同期任务与运动睡眠表。
+            <a href="{% url 'parent_export_weekly_pdf' %}?days=7" class="btn-ghost" style="display:inline-block;text-decoration:none;line-height:1.4;margin-left:6px" target="_blank" rel="noopener">导出近7天 PDF</a>
             <a href="{% url 'parent_export_weekly_pdf' %}?days=14" class="btn-ghost" style="display:inline-block;text-decoration:none;line-height:1.4;margin-left:8px" target="_blank" rel="noopener">导出近14天 PDF</a>
         </p>
         <div class="trend-toolbar">
@@ -833,7 +920,22 @@
             <button type="button" class="trend-days-btn" data-days="14" onclick="loadMealReport(14)">近14天</button>
             <button type="button" class="trend-days-btn" data-days="30" onclick="loadMealReport(30)">近30天</button>
         </div>
-        <div id="trendSummary" style="font-size: 13px; color: #555; margin-bottom: 10px;"></div>
+        <div id="trendSummary" style="font-size: 13px; color: #555; margin-bottom: 12px;"></div>
+        <div class="trend-charts-grid">
+            <div class="trend-chart-card">
+                <div style="font-size: 12px; color: #666;">膳食：日热量与五色均分</div>
+                <div class="trend-chart-canvas-wrap"><canvas id="parentTrendChartMeals" aria-label="膳食趋势折线图"></canvas></div>
+            </div>
+            <div class="trend-chart-card">
+                <div style="font-size: 12px; color: #666;">运动习惯：已确认任务次数 · 步数</div>
+                <div class="trend-chart-canvas-wrap"><canvas id="parentTrendChartActivity" aria-label="任务与步数趋势图"></canvas></div>
+            </div>
+        </div>
+        <div class="trend-chart-sleep-wrap">
+            <div style="font-size: 12px; color: #666;">睡眠：记录总时长（小时，手环有数据才连线）</div>
+            <div class="trend-chart-canvas-wrap"><canvas id="parentTrendChartSleep" aria-label="睡眠时长趋势图"></canvas></div>
+        </div>
+        <p style="font-size: 12px; color: #999; margin-bottom: 8px;">五色分柱状速览（相对高度）</p>
         <div id="trendBars" class="trend-bars"></div>
     </div>
 
@@ -988,24 +1090,30 @@
             <div id="bindStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
         </div>
         <div class="section" style="box-shadow: none; padding: 0; margin: 20px 0 0;">
-            <h3 class="section-title" style="font-size: 16px;">添加班级</h3>
-            <p style="color: #666; font-size: 14px; margin-bottom: 15px;">教师与班级数据由<strong>学校端同事</strong>维护；此处选择班级加入。</p>
+            <h3 class="section-title" style="font-size: 16px;">进班 / 更换班级</h3>
+            <p style="color: #666; font-size: 14px; margin-bottom: 12px;">教师与班级由<strong>学校端</strong>维护。选择孩子与班级后点「保存」会先<strong>退出原班级</strong>再进入新班级（每个孩子在本系统内<strong>仅保留一条</strong>进班记录，与学校端「本班在读名单」一致；若需多班同时在读须另行改数据模型）。</p>
+            <div id="classEnrollmentSummary" style="font-size: 14px; color: #333; margin-bottom: 14px; padding: 12px; background: #f5f5f5; border-radius: 8px;"></div>
             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                 <select id="childSelect" style="flex: 1; min-width: 150px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                     <option value="">选择孩子</option>
                     {% for c in children %}
-                    <option value="{{ c.id }}">{{ c.nickname }}</option>
+                    <option value="{{ c.id }}" {% if c.id == child.id %}selected{% endif %}>{{ c.nickname }}</option>
                     {% endfor %}
                 </select>
                 <select id="teacherSelect" style="flex: 2; min-width: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 8px;">
                     <option value="">选择教师/班级</option>
                 </select>
-                <button type="button" class="btn-add" onclick="addToClass()">添加</button>
+                <button type="button" class="btn-add" onclick="setChildClass()">保存班级（换班）</button>
+            </div>
+            <div style="margin-top: 12px;">
+                <button type="button" class="btn-ghost" onclick="leaveAllClasses()" style="color:#c62828;">退出全部班级</button>
             </div>
             <div id="classStatus" style="margin-top: 15px; font-size: 13px; color: #666;"></div>
         </div>
     </details>
 </div>
+
+{{ children_class_map|json_script:"children-class-data" }}
 
 <form method="POST" action="{% url 'parent_switch_child' %}" id="switchChildForm">
     {% csrf_token %}
@@ -1027,6 +1135,7 @@
 
 <div id="toast" style="position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 12px 24px; border-radius: 8px; display: none; z-index: 3000; max-width: 90%; text-align: center;"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script>
 let cachedFoodOptionsHtml = '';
 let currentCorrectMealId = null;
@@ -1217,6 +1326,68 @@ function saveDietNotes() {
         st.textContent = '网络错误';
         st.style.color = '#c62828';
     });
+}
+
+function splitTagsInput(raw) {
+    return (raw || '').split(/[,，\n\r]+/).map(s => s.trim()).filter(Boolean).slice(0, 30);
+}
+
+function saveHealthTags() {
+    const st = document.getElementById('healthTagsStatus');
+    const allergy = splitTagsInput(document.getElementById('allergyTagsInput').value);
+    const medical = splitTagsInput(document.getElementById('medicalTagsInput').value);
+    const body = 'allergy_tags=' + encodeURIComponent(JSON.stringify(allergy))
+        + '&medical_tags=' + encodeURIComponent(JSON.stringify(medical));
+    fetch('/parent/child-health-tags/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body
+    })
+    .then(r => r.json())
+    .then(data => {
+        st.textContent = data.success ? '已保存' : (data.message || '失败');
+        st.style.color = data.success ? '#2e7d32' : '#c62828';
+        setTimeout(() => { st.textContent = ''; }, 2500);
+    })
+    .catch(() => {
+        st.textContent = '网络错误';
+        st.style.color = '#c62828';
+    });
+}
+
+function markParentAlertRead(alertId) {
+    fetch('/parent/alerts/' + alertId + '/read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) {
+            showToast(data.message || '操作失败');
+            return;
+        }
+        const card = document.querySelector('.alert-card-parent[data-alert-id="' + alertId + '"]');
+        if (card) {
+            card.style.background = '#fafafa';
+            const row = card.querySelector('div[style*="justify-content:space-between"]');
+            if (row) {
+                const btn = row.querySelector('button');
+                if (btn) btn.remove();
+                const sp = document.createElement('span');
+                sp.style.cssText = 'font-size:12px;color:#999;white-space:nowrap;';
+                sp.textContent = '已读';
+                row.appendChild(sp);
+            }
+        }
+        showToast('已标记已读');
+    })
+    .catch(() => showToast('网络错误'));
 }
 
 function loadParentMealHistory(days) {
@@ -1471,6 +1642,17 @@ function addParentRecipe() {
     .catch(() => { st.textContent = '网络错误'; st.style.color = '#c62828'; });
 }
 
+function destroyParentTrendCharts() {
+    const st = window.__parentTrendCharts;
+    if (!st) return;
+    ['meals', 'activity', 'sleep'].forEach(k => {
+        if (st[k]) {
+            try { st[k].destroy(); } catch (e) { /* noop */ }
+            st[k] = null;
+        }
+    });
+}
+
 function loadMealReport(days) {
     document.querySelectorAll('.trend-days-btn').forEach(b => {
         b.classList.toggle('active', parseInt(b.dataset.days, 10) === days);
@@ -1480,26 +1662,203 @@ function loadMealReport(days) {
         .then(data => {
             const sum = document.getElementById('trendSummary');
             const bars = document.getElementById('trendBars');
+            destroyParentTrendCharts();
             if (!data.success || !data.report) {
                 sum.textContent = '暂无数据';
-                bars.innerHTML = '';
+                if (bars) bars.innerHTML = '';
                 return;
             }
             const rep = data.report;
-            const daysN = rep.daily_scores.length || 1;
+            const ds = rep.daily_scores || [];
+            const daysN = ds.length || 1;
             const avgKcal = rep.total_calories / daysN;
-            sum.textContent =
-                `${rep.period} 累计热量约 ${Math.round(rep.total_calories)} kcal，` +
-                `日均约 ${avgKcal.toFixed(0)} kcal；` +
-                `日均五色分 ${rep.avg_daily_score}；蛋白累计 ${rep.total_protein.toFixed(0)}g`;
+            let extra = '';
+            if (rep.total_tasks_completed != null) {
+                extra += ` 已确认习惯任务 <strong>${rep.total_tasks_completed}</strong> 次`;
+            }
+            if (rep.avg_daily_steps != null) {
+                extra += `；有手环步数的天数内日均约 <strong>${rep.avg_daily_steps}</strong> 步`;
+            }
+            sum.innerHTML =
+                `${rep.period} 累计热量约 <strong>${Math.round(rep.total_calories)}</strong> kcal，` +
+                `日均约 <strong>${avgKcal.toFixed(0)}</strong> kcal；` +
+                `日均五色分 <strong>${rep.avg_daily_score}</strong>；蛋白累计 <strong>${rep.total_protein.toFixed(0)}</strong> g。` +
+                extra;
             let bh = '';
-            let maxS = 5;
-            rep.daily_scores.forEach(d => {
+            const maxS = 5;
+            ds.forEach(d => {
                 const h = Math.max(4, Math.round((d.score / maxS) * 100));
                 const md = d.date.slice(5);
                 bh += `<div class="trend-bar-col"><div class="trend-bar" style="height:${h}px" title="${d.date} 分${d.score} 餐${d.meal_count}"></div><span class="trend-date">${md}</span></div>`;
             });
-            bars.innerHTML = bh || '<span style="color:#999;font-size:13px">该时段无餐次记录</span>';
+            if (bars) {
+                bars.innerHTML = bh || '<span style="color:#999;font-size:13px">该时段无餐次记录</span>';
+            }
+
+            const labels = ds.map(d => d.date.slice(5));
+            const calData = ds.map(d => (d.meal_count > 0 || d.day_calories > 0) ? Number(d.day_calories) : null);
+            const scoreData = ds.map(d => (d.meal_count > 0 ? Number(d.score) : null));
+            const tasksData = ds.map(d => Number(d.tasks_completed || 0));
+            const stepsData = ds.map(d => (d.steps != null && d.steps !== '') ? Number(d.steps) : null);
+            const sleepH = ds.map(d => {
+                if (d.sleep_duration_minutes == null || d.sleep_duration_minutes === '') return null;
+                return Math.round((Number(d.sleep_duration_minutes) / 60) * 10) / 10;
+            });
+
+            if (typeof Chart === 'undefined') {
+                return;
+            }
+            if (!window.__parentTrendCharts) window.__parentTrendCharts = { meals: null, activity: null, sleep: null };
+
+            const axisFont = { size: 11 };
+            const gridSoft = { color: 'rgba(0,0,0,0.06)' };
+            const commonOpts = {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'top', labels: { boxWidth: 10, font: axisFont } }
+                }
+            };
+
+            const ctx1 = document.getElementById('parentTrendChartMeals');
+            if (ctx1) {
+                window.__parentTrendCharts.meals = new Chart(ctx1, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: '日热量 (kcal)',
+                                data: calData,
+                                yAxisID: 'y',
+                                borderColor: '#FF9800',
+                                backgroundColor: 'rgba(255,152,0,0.12)',
+                                fill: true,
+                                tension: 0.25,
+                                spanGaps: false,
+                                pointRadius: 3
+                            },
+                            {
+                                label: '五色均分',
+                                data: scoreData,
+                                yAxisID: 'y1',
+                                borderColor: '#1976D2',
+                                backgroundColor: 'transparent',
+                                tension: 0.25,
+                                spanGaps: false,
+                                pointRadius: 3
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOpts,
+                        scales: {
+                            x: { ticks: { font: axisFont, maxRotation: 45, minRotation: 0 }, grid: gridSoft },
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: 'kcal', font: axisFont },
+                                grid: gridSoft,
+                                beginAtZero: true
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                min: 0,
+                                max: 5,
+                                title: { display: true, text: '分', font: axisFont },
+                                grid: { drawOnChartArea: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            const ctx2 = document.getElementById('parentTrendChartActivity');
+            if (ctx2) {
+                window.__parentTrendCharts.activity = new Chart(ctx2, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [
+                            {
+                                label: '已确认任务 (次/日)',
+                                data: tasksData,
+                                yAxisID: 'y',
+                                borderColor: '#43A047',
+                                backgroundColor: 'rgba(67,160,71,0.12)',
+                                fill: true,
+                                stepped: false,
+                                tension: 0.2,
+                                pointRadius: 3
+                            },
+                            {
+                                label: '步数',
+                                data: stepsData,
+                                yAxisID: 'y1',
+                                borderColor: '#7B1FA2',
+                                backgroundColor: 'transparent',
+                                tension: 0.25,
+                                spanGaps: true,
+                                pointRadius: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOpts,
+                        scales: {
+                            x: { ticks: { font: axisFont, maxRotation: 45 }, grid: gridSoft },
+                            y: {
+                                type: 'linear',
+                                position: 'left',
+                                title: { display: true, text: '任务', font: axisFont },
+                                grid: gridSoft,
+                                beginAtZero: true,
+                                ticks: { stepSize: 1, precision: 0 }
+                            },
+                            y1: {
+                                type: 'linear',
+                                position: 'right',
+                                title: { display: true, text: '步', font: axisFont },
+                                grid: { drawOnChartArea: false },
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            const ctx3 = document.getElementById('parentTrendChartSleep');
+            if (ctx3) {
+                window.__parentTrendCharts.sleep = new Chart(ctx3, {
+                    type: 'line',
+                    data: {
+                        labels,
+                        datasets: [{
+                            label: '睡眠 (小时)',
+                            data: sleepH,
+                            borderColor: '#5C6BC0',
+                            backgroundColor: 'rgba(92,107,192,0.15)',
+                            fill: true,
+                            tension: 0.3,
+                            spanGaps: true,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        ...commonOpts,
+                        scales: {
+                            x: { ticks: { font: axisFont, maxRotation: 45 }, grid: gridSoft },
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: '小时', font: axisFont },
+                                grid: gridSoft
+                            }
+                        }
+                    }
+                });
+            }
         })
         .catch(() => showToast('报告加载失败'));
 }
@@ -1516,6 +1875,76 @@ function loadTeachers() {
             document.getElementById('teacherSelect').innerHTML = html;
         }
     });
+}
+
+let childrenClassMap = {};
+
+function refreshClassSummary() {
+    const el = document.getElementById('classEnrollmentSummary');
+    const sel = document.getElementById('childSelect');
+    if (!el || !sel) return;
+    const cid = sel.value;
+    if (!cid) {
+        el.textContent = '请先选择孩子。';
+        return;
+    }
+    const rows = childrenClassMap[cid] || [];
+    if (!rows.length) {
+        el.innerHTML = '<strong>当前：</strong>未进班（学校端不会在本班名单中看到该孩子）';
+        return;
+    }
+    const parts = rows.map(r => `${escapeHtml(r.school)} · ${escapeHtml(r.class_name)}（${escapeHtml(r.teacher_name)}）`);
+    el.innerHTML = '<strong>当前进班：</strong>' + parts.join('；');
+}
+
+function setChildClass() {
+    const childId = document.getElementById('childSelect').value;
+    const teacherId = document.getElementById('teacherSelect').value;
+    if (!childId || !teacherId) {
+        showToast('请选择孩子和要进入的教师/班级');
+        return;
+    }
+    fetch('/parent/child-class/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `child_id=${encodeURIComponent(childId)}&teacher_id=${encodeURIComponent(teacherId)}`
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message);
+        if (data.success) {
+            childrenClassMap[childId] = data.enrollments || [];
+            document.getElementById('classStatus').innerHTML = '<span style="color: #4CAF50;">' + escapeHtml(data.message) + '</span>';
+            refreshClassSummary();
+        } else {
+            document.getElementById('classStatus').innerHTML = '<span style="color: #f44336;">' + escapeHtml(data.message || '') + '</span>';
+        }
+    })
+    .catch(() => showToast('网络错误'));
+}
+
+function leaveAllClasses() {
+    const childId = document.getElementById('childSelect').value;
+    if (!childId) {
+        showToast('请先选择孩子');
+        return;
+    }
+    if (!confirm('确定让该孩子退出所有已进班级？')) return;
+    fetch('/parent/child-class/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `child_id=${encodeURIComponent(childId)}&teacher_id=`
+    })
+    .then(r => r.json())
+    .then(data => {
+        showToast(data.message);
+        if (data.success) {
+            childrenClassMap[childId] = [];
+            document.getElementById('classStatus').innerHTML = '<span style="color: #4CAF50;">' + escapeHtml(data.message) + '</span>';
+            refreshClassSummary();
+        }
+    })
+    .catch(() => showToast('网络错误'));
 }
 
 function bindChild() {
@@ -1546,33 +1975,25 @@ function bindChild() {
     });
 }
 
-function addToClass() {
-    const childId = document.getElementById('childSelect').value;
-    const teacherId = document.getElementById('teacherSelect').value;
-    if (!childId || !teacherId) {
-        showToast('请选择孩子和教师');
-        return;
-    }
-    fetch('/parent/add-to-class/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/x-www-form-urlencoded'},
-        body: `child_id=${encodeURIComponent(childId)}&teacher_id=${encodeURIComponent(teacherId)}`
-    })
-    .then(r => r.json())
-    .then(data => {
-        showToast(data.message);
-        if (data.success) {
-            document.getElementById('classStatus').innerHTML = '<span style="color: #4CAF50;">添加成功！孩子已加入班级。</span>';
-        }
-    });
-}
-
 document.addEventListener('DOMContentLoaded', function() {
+    const el = document.getElementById('children-class-data');
+    if (el) {
+        try {
+            childrenClassMap = JSON.parse(el.textContent);
+        } catch (e) {
+            childrenClassMap = {};
+        }
+    }
+    const cs = document.getElementById('childSelect');
+    if (cs) {
+        cs.addEventListener('change', refreshClassSummary);
+    }
     const bd = document.getElementById('birthDateInput');
     if (bd) {
         bd.setAttribute('max', new Date().toISOString().slice(0, 10));
     }
     loadTeachers();
+    refreshClassSummary();
     loadMealReport(7);
     loadParentMealHistory(14);
     loadRecipes(true, 30);

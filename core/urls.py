@@ -17,6 +17,7 @@ urlpatterns = [
     path('child/meal-history/', views.child_meal_history, name='child_meal_history'),
     path('child/alerts/', views.child_health_alerts, name='child_health_alerts'),
     path('child/alerts/<int:alert_id>/read/', views.child_mark_alert_read, name='child_mark_alert_read'),
+    path('child/recommended-intake/', views.child_recommended_intake, name='child_recommended_intake'),
     path('child/badges/', views.child_badges, name='child_badges'),
     path('child/update-avatar/', views.child_update_avatar, name='child_update_avatar'),
 
@@ -52,11 +53,13 @@ urlpatterns = [
     path('parent/meal-report/', views.parent_meal_report, name='parent_meal_report'),
     path('parent/export-weekly-pdf/', views.parent_export_weekly_pdf, name='parent_export_weekly_pdf'),
     path('parent/add-to-class/', views.parent_add_to_class, name='parent_add_to_class'),
+    path('parent/child-class/', views.parent_set_child_class, name='parent_set_child_class'),
     path('parent/get-teachers/', views.parent_get_teachers, name='parent_get_teachers'),
     path('parent/bind-child/', views.parent_bind_child, name='parent_bind_child'),
 
     # 学校端（建议仅由负责学校端的同事修改本块）
     path('school/', views.school_dashboard, name='school_dashboard'),
+    path('school/export-weekly-pdf/', views.school_export_weekly_pdf, name='school_export_weekly_pdf'),
     path('school/alerts/', views.school_health_alerts, name='school_health_alerts'),
     path('school/alerts/<int:alert_id>/read/', views.school_mark_alert_read, name='school_mark_alert_read'),
     path('school/create-activity/', views.school_create_activity, name='school_create_activity'),

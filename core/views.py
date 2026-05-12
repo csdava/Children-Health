@@ -155,6 +155,29 @@ def user_logout(request):
 
 # ========== 儿童端视图 ==========
 
+
+def _intake_and_tags_for_child(child: Child) -> dict:
+    """与家长端 `parent_child_recommended_intake` 同源的参考摄入 + 家庭维护标签（只读展示用）。"""
+    from .nutrition import recommend_intake_for_age
+
+    age = child.age_years()
+    rec = recommend_intake_for_age(age)
+    return {
+        'age_years': age,
+        'recommendation': None
+        if rec is None
+        else {
+            'calories_kcal_min': rec.calories_kcal_min,
+            'calories_kcal_max': rec.calories_kcal_max,
+            'protein_g_min': rec.protein_g_min,
+            'protein_g_max': rec.protein_g_max,
+            'notes': rec.notes,
+        },
+        'allergy_tags': list(child.allergy_tags or []),
+        'medical_tags': list(child.medical_tags or []),
+    }
+
+
 @login_required
 def child_dashboard(request):
     """儿童端首页"""
@@ -170,8 +193,12 @@ def child_dashboard(request):
             'progress_percent': 0,
             'today_meals': [],
             'badges': [],
-            'active_challenges': []
+            'active_challenges': [],
+            'family_health_readonly': None,
         })
+
+    if not child.bind_code:
+        child.generate_bind_code()
 
     today = timezone.now().date()
     tasks = Task.objects.all()
@@ -215,6 +242,7 @@ def child_dashboard(request):
 
     return render(request, 'child/dashboard.html', {
         'child': child,
+        'today': today,
         'daily_records': daily_records,
         'encouragements': encouragements,
         'latest_encouragement': latest_encouragement,
@@ -222,6 +250,7 @@ def child_dashboard(request):
         'today_meals': today_meals,
         'badges': badges,
         'active_challenges': active_challenges,
+        'family_health_readonly': _intake_and_tags_for_child(child),
     })
 
 
@@ -251,9 +280,10 @@ def child_submit_task(request, task_id):
 @require_http_methods(["POST"])
 def child_mark_encouragement_read(request, encouragement_id):
     """标记鼓励语已读"""
-    encouragement = get_object_or_404(
-        Encouragement, id=encouragement_id, child__parent=request.user
-    )
+    child = Child.objects.filter(user=request.user).first()
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'}, status=400)
+    encouragement = get_object_or_404(Encouragement, id=encouragement_id, child=child)
     encouragement.is_read = True
     encouragement.save()
     return JsonResponse({'success': True})
@@ -273,6 +303,7 @@ def register_child(request):
             gender=gender,
             parent=request.user
         )
+        child.generate_bind_code()
 
         for code, name in Task.TASK_TYPES:
             task = Task.objects.get_or_create(
@@ -618,6 +649,23 @@ def child_meal_history(request):
 
 
 @login_required
+def child_recommended_intake(request):
+    """儿童端：参考摄入与家庭维护标签（只读），与 `GET /parent/recommended-intake/` 字段口径一致。"""
+    child = Child.objects.filter(user=request.user).first()
+    if not child:
+        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
+
+    payload = _intake_and_tags_for_child(child)
+    return JsonResponse({
+        'success': True,
+        'child': {'id': child.id, 'nickname': child.nickname, 'age_years': payload['age_years']},
+        'recommendation': payload['recommendation'],
+        'allergy_tags': payload['allergy_tags'],
+        'medical_tags': payload['medical_tags'],
+    })
+
+
+@login_required
 def child_health_alerts(request):
     """儿童端拉取预警列表。"""
     child = Child.objects.filter(user=request.user).first()
@@ -818,9 +866,30 @@ def parent_dashboard(request):
         today_meal_totals['fat'] += float(m.total_fat or 0)
         today_meal_totals['count'] += 1
 
+    from .nutrition import recommend_intake_for_age
+
+    age_y = child.age_years()
+    intake_recommendation = recommend_intake_for_age(age_y)
+    parent_health_alerts = list(
+        HealthAlert.objects.filter(child=child).order_by('-created_at')[:20]
+    )
+    parent_alerts_unread = sum(1 for a in parent_health_alerts if not a.is_read_by_parent)
+
+    children_class_map = {}
+    for c in children:
+        rows = []
+        for e in ClassStudent.objects.filter(child=c).select_related('teacher__user', 'teacher__school'):
+            rows.append({
+                'teacher_id': e.teacher_id,
+                'school': e.teacher.school.name,
+                'class_name': e.teacher.class_name,
+                'teacher_name': e.teacher.user.username,
+            })
+        children_class_map[str(c.id)] = rows
+
     return render(request, 'parent/dashboard.html', {
         'child': child,
-        'child_age_years': child.age_years(),
+        'child_age_years': age_y,
         'children': children,
         'pending_tasks': pending_tasks,
         'week_completed': week_completed,
@@ -830,6 +899,10 @@ def parent_dashboard(request):
         'progress_percent': progress_percent,
         'today_meals': today_meals,
         'today_meal_totals': today_meal_totals,
+        'intake_recommendation': intake_recommendation,
+        'parent_health_alerts': parent_health_alerts,
+        'parent_alerts_unread': parent_alerts_unread,
+        'children_class_map': children_class_map,
     })
 
 
@@ -1242,6 +1315,8 @@ def parent_child_recommended_intake(request):
             'protein_g_max': rec.protein_g_max,
             'notes': rec.notes,
         },
+        'allergy_tags': list(child.allergy_tags or []),
+        'medical_tags': list(child.medical_tags or []),
     })
 
 
@@ -1461,7 +1536,7 @@ def parent_recipe_create(request):
 
 @login_required
 def parent_meal_report(request):
-    """多维膳食报告"""
+    """多维健康报告：膳食 + 每日已确认任务 + 手环步数/睡眠（若有）。"""
     child, _children = _parent_resolve_child(request)
     if not child:
         return JsonResponse({'success': False, 'message': '未找到孩子信息'})
@@ -1470,25 +1545,60 @@ def parent_meal_report(request):
     today = timezone.now().date()
     start_date = today - timedelta(days=days - 1)
 
-    meals = MealRecord.objects.filter(
-        child=child, date__gte=start_date
-    )
+    meals = MealRecord.objects.filter(child=child, date__gte=start_date)
 
-    total_calories = meals.aggregate(Sum('total_calories'))['total_calories__sum'] or 0
-    total_protein = meals.aggregate(Sum('total_protein'))['total_protein__sum'] or 0
-    total_carbohydrate = meals.aggregate(Sum('total_carbohydrate'))['total_carbohydrate__sum'] or 0
-    total_fat = meals.aggregate(Sum('total_fat'))['total_fat__sum'] or 0
+    total_calories = float(meals.aggregate(Sum('total_calories'))['total_calories__sum'] or 0)
+    total_protein = float(meals.aggregate(Sum('total_protein'))['total_protein__sum'] or 0)
+    total_carbohydrate = float(meals.aggregate(Sum('total_carbohydrate'))['total_carbohydrate__sum'] or 0)
+    total_fat = float(meals.aggregate(Sum('total_fat'))['total_fat__sum'] or 0)
+
+    health_map = {
+        h.date.isoformat(): h
+        for h in HealthData.objects.filter(child=child, date__gte=start_date, date__lte=today)
+    }
 
     daily_scores = []
+    step_vals = []
     for day_offset in range(days):
         day = start_date + timedelta(days=day_offset)
         day_meals = meals.filter(date=day)
-        avg_score = sum(m.total_score for m in day_meals) / max(day_meals.count(), 1)
+        meal_count = day_meals.count()
+        avg_score = sum(m.total_score for m in day_meals) / max(meal_count, 1)
+        day_kcal = float(day_meals.aggregate(s=Sum('total_calories'))['s'] or 0)
+        tasks_done = TaskRecord.objects.filter(child=child, date=day, status='completed').count()
+        hd = health_map.get(day.isoformat())
+        steps = int(hd.steps) if hd else None
+        sleep_min = int(hd.sleep_duration_minutes) if hd else None
+        if steps is not None:
+            step_vals.append(steps)
         daily_scores.append({
             'date': day.isoformat(),
             'score': round(avg_score, 1),
-            'meal_count': day_meals.count()
+            'meal_count': meal_count,
+            'day_calories': round(day_kcal, 1),
+            'tasks_completed': tasks_done,
+            'steps': steps,
+            'sleep_duration_minutes': sleep_min,
         })
+
+    task_rows = (
+        TaskRecord.objects.filter(
+            child=child, date__gte=start_date, date__lte=today, status='completed'
+        )
+        .values('task__code', 'task__name')
+        .annotate(cnt=Count('id'))
+        .order_by('-cnt')
+    )
+    tasks_summary = [{'code': r['task__code'], 'name': r['task__name'], 'count': r['cnt']} for r in task_rows]
+    total_tasks_completed = int(
+        TaskRecord.objects.filter(
+            child=child, date__gte=start_date, date__lte=today, status='completed'
+        ).count()
+    )
+
+    avg_daily_steps = None
+    if step_vals:
+        avg_daily_steps = round(sum(step_vals) / len(step_vals), 1)
 
     return JsonResponse({
         'success': True,
@@ -1499,23 +1609,20 @@ def parent_meal_report(request):
             'total_carbohydrate': round(total_carbohydrate, 1),
             'total_fat': round(total_fat, 1),
             'avg_daily_score': round(sum(d['score'] for d in daily_scores) / max(len(daily_scores), 1), 1),
-            'daily_scores': daily_scores
+            'daily_scores': daily_scores,
+            'tasks_summary': tasks_summary,
+            'total_tasks_completed': total_tasks_completed,
+            'health_days_with_data': len(step_vals),
+            'avg_daily_steps': avg_daily_steps,
         }
     })
 
 
-@login_required
-def parent_export_weekly_pdf(request):
-    """导出膳食与任务周报 PDF（默认近 7 天，含今天）。"""
-    from urllib.parse import quote
+def _weekly_pdf_ctx(child, days: int, footer: str) -> dict:
+    """组装健康周报 PDF 所需上下文（家长端 / 学校端共用）。"""
+    from .nutrition import recommend_intake_for_age
 
-    from .pdf_weekly import build_parent_weekly_pdf
-
-    child, _children = _parent_resolve_child(request)
-    if not child:
-        return HttpResponse('未找到孩子信息', status=400, content_type='text/plain; charset=utf-8')
-
-    days = max(1, min(30, int(request.GET.get('days', 7))))
+    days = max(1, min(30, int(days)))
     today = timezone.now().date()
     start = today - timedelta(days=days - 1)
 
@@ -1525,8 +1632,15 @@ def parent_export_weekly_pdf(request):
     total_carb = float(meals.aggregate(Sum('total_carbohydrate'))['total_carbohydrate__sum'] or 0)
     total_fat = float(meals.aggregate(Sum('total_fat'))['total_fat__sum'] or 0)
 
+    health_map = {
+        h.date.isoformat(): h
+        for h in HealthData.objects.filter(child=child, date__gte=start, date__lte=today)
+    }
+
     daily_rows = []
     score_sum = 0.0
+    step_sum = 0
+    step_days = 0
     for offset in range(days):
         day = start + timedelta(days=offset)
         day_meals = list(meals.filter(date=day))
@@ -1534,11 +1648,21 @@ def parent_export_weekly_pdf(request):
         avg_score = sum(m.total_score for m in day_meals) / max(cnt, 1)
         score_sum += avg_score
         day_cals = sum(float(m.total_calories or 0) for m in day_meals)
+        tasks_done = TaskRecord.objects.filter(child=child, date=day, status='completed').count()
+        hd = health_map.get(day.isoformat())
+        steps = int(hd.steps) if hd else None
+        sleep_min = int(hd.sleep_duration_minutes) if hd else None
+        if steps is not None:
+            step_sum += steps
+            step_days += 1
         daily_rows.append({
             'date': day.strftime('%Y-%m-%d'),
             'meal_count': cnt,
             'day_calories': day_cals,
             'avg_score': avg_score,
+            'tasks_completed': tasks_done,
+            'steps': steps,
+            'sleep_minutes': sleep_min,
         })
 
     avg_daily_score = score_sum / max(days, 1)
@@ -1546,16 +1670,27 @@ def parent_export_weekly_pdf(request):
         child=child, date__gte=start, date__lte=today, status='completed'
     ).count()
 
-    from .nutrition import recommend_intake_for_age
+    task_rows = (
+        TaskRecord.objects.filter(
+            child=child, date__gte=start, date__lte=today, status='completed'
+        )
+        .values('task__code', 'task__name')
+        .annotate(cnt=Count('id'))
+        .order_by('-cnt')
+    )
+    tasks_summary = [{'code': r['task__code'], 'name': r['task__name'], 'count': r['cnt']} for r in task_rows]
+
     age = child.age_years()
     rec = recommend_intake_for_age(age)
 
-    gen_at = timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M')
-    ctx = {
-        'title': f'儿童膳食周报（近{days}天）',
+    return {
+        'title': f'儿童健康周报（近{days}天）',
         'child_label': f'孩子：{child.nickname}（{child.get_gender_display()}）',
         'age_years': age,
-        'period_label': f'统计区间：{start.isoformat()} ～ {today.isoformat()}',
+        'period_label': (
+            f'统计区间: {start.isoformat()} - {today.isoformat()} '
+            f'(膳食、任务、运动睡眠)'
+        ),
         'daily_rows': daily_rows,
         'totals': {
             'kcal': total_calories,
@@ -1565,6 +1700,9 @@ def parent_export_weekly_pdf(request):
         },
         'avg_daily_score': avg_daily_score,
         'task_completed_count': task_completed,
+        'tasks_summary': tasks_summary,
+        'avg_daily_steps': round(step_sum / step_days, 1) if step_days else None,
+        'health_days_with_data': step_days,
         'allergy_tags': child.allergy_tags if isinstance(child.allergy_tags, list) else [],
         'medical_tags': child.medical_tags if isinstance(child.medical_tags, list) else [],
         'intake': None if rec is None else {
@@ -1575,12 +1713,67 @@ def parent_export_weekly_pdf(request):
             'notes': rec.notes,
         },
         'diet_notes': (child.diet_notes or '').strip(),
-        'footer': f'由健康管理家庭端生成 · {gen_at}',
+        'footer': footer,
+        '_meta_start': start,
+        '_meta_today': today,
     }
+
+
+@login_required
+def parent_export_weekly_pdf(request):
+    """导出健康周报 PDF（膳食 + 任务 + 手环；默认近 7 天，含今天）。"""
+    from urllib.parse import quote
+
+    from .pdf_weekly import build_parent_weekly_pdf
+
+    child, _children = _parent_resolve_child(request)
+    if not child:
+        return HttpResponse('未找到孩子信息', status=400, content_type='text/plain; charset=utf-8')
+
+    days = max(1, min(30, int(request.GET.get('days', 7))))
+    gen_at = timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M')
+    ctx = _weekly_pdf_ctx(child, days, footer=f'由健康管理家庭端生成, {gen_at}')
+    start = ctx.pop('_meta_start')
+    today = ctx.pop('_meta_today')
 
     pdf_bytes = build_parent_weekly_pdf(ctx)
     ascii_name = f'weekly_report_{child.id}_{start}_{today}.pdf'
-    display_name = f'膳食周报_{child.nickname}_{start}_{today}.pdf'
+    display_name = f'健康周报_{child.nickname}_{start}_{today}.pdf'
+    resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+    resp['Content-Disposition'] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(display_name)}'
+    )
+    return resp
+
+
+@login_required
+@user_passes_test(is_teacher)
+def school_export_weekly_pdf(request):
+    """学校端：为本班一名学生导出与家长端同口径的健康周报 PDF。"""
+    from urllib.parse import quote
+
+    from .pdf_weekly import build_parent_weekly_pdf
+
+    teacher = request.user.teacher_profile
+    try:
+        child_id = int(request.GET.get('child_id', '0'))
+    except ValueError:
+        return HttpResponse('参数 child_id 无效', status=400, content_type='text/plain; charset=utf-8')
+
+    if not ClassStudent.objects.filter(teacher=teacher, child_id=child_id).exists():
+        return HttpResponse('无权导出该学生或学生不在本班', status=403, content_type='text/plain; charset=utf-8')
+
+    child = get_object_or_404(Child, id=child_id)
+    days = max(1, min(30, int(request.GET.get('days', 7))))
+    gen_at = timezone.localtime(timezone.now()).strftime('%Y-%m-%d %H:%M')
+    src = f'{teacher.school.name} {teacher.class_name} 学校端'
+    ctx = _weekly_pdf_ctx(child, days, footer=f'由 {src} 生成, {gen_at}')
+    start = ctx.pop('_meta_start')
+    today = ctx.pop('_meta_today')
+
+    pdf_bytes = build_parent_weekly_pdf(ctx)
+    ascii_name = f'school_weekly_{child.id}_{start}_{today}.pdf'
+    display_name = f'健康周报_{child.nickname}_{start}_{today}.pdf'
     resp = HttpResponse(pdf_bytes, content_type='application/pdf')
     resp['Content-Disposition'] = (
         f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(display_name)}'
@@ -1630,6 +1823,49 @@ def parent_add_to_class(request):
 
     ClassStudent.objects.create(teacher=teacher, child=child)
     return JsonResponse({'success': True, 'message': '已成功添加到班级'})
+
+
+@login_required
+@require_http_methods(["POST"])
+def parent_set_child_class(request):
+    """将孩子与班级的关联改为指定教师班级：先解除该孩子所有进班记录，再按需加入新班；不传 teacher_id 则仅退出。"""
+    child_id = (request.POST.get('child_id') or '').strip()
+    teacher_id_raw = (request.POST.get('teacher_id') or '').strip()
+
+    if not child_id:
+        return JsonResponse({'success': False, 'message': '请选择孩子'})
+
+    children = Child.objects.filter(parent=request.user)
+    try:
+        child = children.get(id=int(child_id))
+    except (Child.DoesNotExist, ValueError):
+        return JsonResponse({'success': False, 'message': '未找到孩子'})
+
+    ClassStudent.objects.filter(child=child).delete()
+
+    if not teacher_id_raw or teacher_id_raw in ('0', 'none', 'null'):
+        return JsonResponse({
+            'success': True,
+            'message': '已退出所有班级',
+            'enrollments': [],
+        })
+
+    try:
+        teacher = Teacher.objects.select_related('school', 'user').get(id=int(teacher_id_raw))
+    except (ValueError, Teacher.DoesNotExist):
+        return JsonResponse({'success': False, 'message': '未找到教师/班级'})
+
+    ClassStudent.objects.create(teacher=teacher, child=child)
+    return JsonResponse({
+        'success': True,
+        'message': f'已切换到 {teacher.school.name} · {teacher.class_name}',
+        'enrollments': [{
+            'teacher_id': teacher.id,
+            'school': teacher.school.name,
+            'class_name': teacher.class_name,
+            'teacher_name': teacher.user.username,
+        }],
+    })
 
 
 @login_required
@@ -2370,6 +2606,7 @@ def school_dashboard(request):
 
         avg_tasks = sum(student_tasks.values()) / 7 if student_tasks else 0
 
+        hp = _intake_and_tags_for_child(child)
         students_data.append({
             'id': child.id,
             'nickname': child.nickname,
@@ -2377,6 +2614,10 @@ def school_dashboard(request):
             'week_tasks': week_records.count(),
             'avg_tasks': round(avg_tasks, 1),
             'daily_tasks': student_tasks,
+            'age_years': hp['age_years'],
+            'intake_recommendation': hp['recommendation'],
+            'allergy_tags': hp['allergy_tags'],
+            'medical_tags': hp['medical_tags'],
         })
 
     students_data.sort(key=lambda x: x['level'], reverse=True)

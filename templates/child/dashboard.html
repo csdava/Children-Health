@@ -42,6 +42,144 @@
         color: #aaa;
     }
 
+    .bind-code-panel {
+        margin-top: 16px;
+        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .bind-code-panel .bind-label {
+        font-size: 12px;
+        color: #b0b8d0;
+        margin-bottom: 8px;
+    }
+
+    .bind-code-panel .bind-value {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: 0.35em;
+        color: #fff;
+        margin-bottom: 8px;
+    }
+
+    .bind-code-panel .bind-hint {
+        font-size: 12px;
+        color: #9aa5c4;
+        line-height: 1.5;
+    }
+
+    .bind-code-panel .btn-copy-bind {
+        margin-top: 10px;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: none;
+        background: linear-gradient(135deg, #4CAF50, #66bb6a);
+        color: #fff;
+        font-size: 13px;
+        cursor: pointer;
+    }
+
+    .parent-notes-card {
+        background: #fff8e1;
+        border: 1px solid #ffe082;
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .parent-notes-card h3 {
+        margin: 0 0 8px;
+        font-size: 15px;
+        color: #f57f17;
+    }
+
+    .parent-notes-card p {
+        margin: 0;
+        font-size: 14px;
+        color: #5d4037;
+        line-height: 1.55;
+        white-space: pre-wrap;
+    }
+
+    .intake-readonly-card {
+        background: #e8f5e9;
+        border: 1px solid #a5d6a7;
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-bottom: 16px;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .intake-readonly-card h3 {
+        margin: 0 0 8px;
+        font-size: 15px;
+        color: #2e7d32;
+    }
+
+    .intake-readonly-card p {
+        margin: 0;
+        font-size: 14px;
+        color: #1b5e20;
+        line-height: 1.55;
+    }
+
+    .child-alerts-section {
+        background: white;
+        border-radius: 16px;
+        padding: 22px 24px;
+        margin-bottom: 16px;
+        max-width: 800px;
+        margin-left: auto;
+        margin-right: auto;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .child-alerts-section h3 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        color: #333;
+    }
+
+    .child-alerts-section .alerts-sub {
+        font-size: 13px;
+        color: #888;
+        margin: 0 0 14px;
+        line-height: 1.5;
+    }
+
+    .child-alert-row {
+        padding: 12px 14px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        border-left: 4px solid #c62828;
+        background: #fff8f8;
+        font-size: 14px;
+    }
+
+    .child-alert-row.read {
+        border-left-color: #bdbdbd;
+        background: #fafafa;
+    }
+
+    .child-alert-row.medical {
+        border-left-color: #1565c0;
+        background: #f3f8ff;
+    }
+
+    .child-alert-meta {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 6px;
+    }
+
     .level-badge {
         background: linear-gradient(135deg, #FFD700, #FFA500);
         padding: 12px 24px;
@@ -848,10 +986,63 @@
         <div class="child-info">
             <div class="child-name">{{ child.nickname }}</div>
             <div class="current-date">{{ today|date:"Y年m月d日" }}</div>
+            {% if child.bind_code %}
+            <div class="bind-code-panel">
+                <div class="bind-label">家长绑定码（6 位，请让家长在家庭端输入）</div>
+                <div class="bind-value" id="childBindCodeDisplay">{{ child.bind_code }}</div>
+                <div class="bind-hint">
+                    {% if child.parent_id %}
+                    已与家长账号关联；绑定码仍可让家长核对或告知其他监护人。
+                    {% else %}
+                    尚未绑定家长：请把上方编码告诉家长，在家庭端「家庭与班级」中完成绑定。
+                    {% endif %}
+                </div>
+                <button type="button" class="btn-copy-bind" onclick="copyChildBindCode()">复制绑定码</button>
+            </div>
+            {% endif %}
         </div>
         <div class="level-badge">
             Lv.{{ child.level }} 小勇士
         </div>
+    </div>
+
+    {% if child.diet_notes %}
+    <div class="parent-notes-card">
+        <h3>家长备注（家庭端维护 · 只读）</h3>
+        <p>{{ child.diet_notes }}</p>
+    </div>
+    {% endif %}
+    {% if child.allergy_tags or child.medical_tags %}
+    <div class="parent-notes-card" style="background:#fce4ec;border-color:#f48fb1;">
+        <h3 style="color:#ad1457;">家长登记的饮食注意（只读）</h3>
+        {% if child.allergy_tags %}
+        <p style="margin:0 0 8px;"><strong>过敏相关：</strong>{% for t in child.allergy_tags %}<span style="display:inline-block;background:#fff;padding:2px 8px;border-radius:6px;margin:2px 4px 2px 0;">{{ t }}</span>{% endfor %}</p>
+        {% endif %}
+        {% if child.medical_tags %}
+        <p style="margin:0;"><strong>医嘱 / 原则：</strong>{% for t in child.medical_tags %}<span style="display:inline-block;background:#fff;padding:2px 8px;border-radius:6px;margin:2px 4px 2px 0;">{{ t }}</span>{% endfor %}</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if family_health_readonly %}
+    <div class="intake-readonly-card">
+        <h3>每日参考摄入（与家庭端口径一致 · 只读）</h3>
+        {% if family_health_readonly.recommendation %}
+        <p>
+            热量约 <strong>{{ family_health_readonly.recommendation.calories_kcal_min }}–{{ family_health_readonly.recommendation.calories_kcal_max }}</strong> kcal/日，
+            蛋白质约 <strong>{{ family_health_readonly.recommendation.protein_g_min }}–{{ family_health_readonly.recommendation.protein_g_max }}</strong> g/日。
+            {{ family_health_readonly.recommendation.notes }}
+        </p>
+        {% else %}
+        <p style="color:#666;">请家长在家庭端填写<strong>出生日期</strong>后，系统才能按年龄给出参考区间（非医疗诊断）。</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="child-alerts-section" id="sec-child-alerts">
+        <h3>健康预警</h3>
+        <p class="alerts-sub">与家庭端、学校端同源：拍照识别或家长修正餐食时若命中<strong>过敏标签</strong>会在此提示；已读状态仅同步给你本人界面。</p>
+        <div id="childAlertsList"><p style="color:#999;font-size:14px;">加载中…</p></div>
     </div>
 
     <div class="warrior-card">
@@ -1378,6 +1569,32 @@ function submitTask(taskId) {
     });
 }
 
+function copyChildBindCode() {
+    const el = document.getElementById('childBindCodeDisplay');
+    if (!el) return;
+    const code = el.textContent.trim();
+    if (!code) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(() => showToast('已复制到剪贴板')).catch(() => fallbackCopy(code));
+    } else {
+        fallbackCopy(code);
+    }
+}
+
+function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+        document.execCommand('copy');
+        showToast('已复制到剪贴板');
+    } catch (e) {
+        showToast('复制失败，请手动长按选择');
+    }
+    document.body.removeChild(ta);
+}
+
 function closeEncouragement(id) {
     fetch(`/child/encouragement/${id}/read/`, {
         method: 'POST',
@@ -1734,9 +1951,64 @@ function loadHealthData() {
     });
 }
 
+function escapeHtmlChild(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function loadChildAlerts() {
+    const host = document.getElementById('childAlertsList');
+    if (!host) return;
+    fetch('/child/alerts/?limit=30')
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) {
+                host.innerHTML = '<p style="color:#999">' + escapeHtmlChild(data.message || '无法加载') + '</p>';
+                return;
+            }
+            if (!data.alerts || !data.alerts.length) {
+                host.innerHTML = '<p style="color:#999;font-size:14px;">暂无预警。好好吃饭，继续加油～</p>';
+                return;
+            }
+            let html = '';
+            data.alerts.forEach(a => {
+                const read = a.is_read ? ' read' : '';
+                const med = (a.type === 'medical') ? ' medical' : '';
+                const btn = a.is_read ? '' : '<button type="button" class="btn-apply" style="margin-top:8px;padding:6px 14px;font-size:13px;" onclick="markChildAlertRead(' + a.id + ')">标记已读</button>';
+                html += '<div class="child-alert-row' + read + med + '" data-aid="' + a.id + '">' +
+                    '<div class="child-alert-meta">' + escapeHtmlChild(a.created_at) + ' · ' + (a.type === 'allergy' ? '过敏' : '医嘱') + '</div>' +
+                    '<div style="font-weight:600;color:#333;">' + escapeHtmlChild(a.title) + '</div>' +
+                    '<div style="margin-top:6px;color:#444;line-height:1.5;">' + escapeHtmlChild(a.message) + '</div>' + btn + '</div>';
+            });
+            host.innerHTML = html;
+        })
+        .catch(() => { host.innerHTML = '<p style="color:#f44336;font-size:14px;">加载失败</p>'; });
+}
+
+function markChildAlertRead(id) {
+    fetch('/child/alerts/' + id + '/read/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (!data.success) return;
+        const row = document.querySelector('.child-alert-row[data-aid="' + id + '"]');
+        if (row) {
+            row.classList.add('read');
+            const b = row.querySelector('button');
+            if (b) b.remove();
+        }
+    });
+}
+
 // 页面加载时获取健康数据
 document.addEventListener('DOMContentLoaded', function() {
     loadHealthData();
+    loadChildAlerts();
     // 每30秒自动刷新健康数据
     healthRefreshInterval = setInterval(loadHealthData, 30000);
 });
