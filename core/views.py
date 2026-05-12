@@ -1664,55 +1664,114 @@ def parent_bind_child(request):
 @login_required
 @require_http_methods(["POST"])
 def health_manual_input(request):
-    """手动录入健康数据（儿童端）"""
+    """手动录入健康数据：JSON 请求体（App）或表单 / FormData（儿童端页面）。"""
     child = Child.objects.filter(user=request.user).first()
     if not child:
         return JsonResponse({'success': False, 'message': '未找到孩子信息'})
 
-    try:
-        import json
-        data = json.loads(request.body)
+    today = timezone.now().date()
+    ct = (request.content_type or '').lower()
 
-        today = timezone.now().date()
+    if 'application/json' in ct and request.body:
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'message': '无效的JSON数据'})
+        try:
+            health_data, created = HealthData.objects.get_or_create(
+                child=child,
+                date=today,
+                defaults={
+                    'steps': int(data.get('steps', 0) or 0),
+                    'step_goal': int(data.get('step_goal', 8000) or 8000),
+                    'active_minutes': int(data.get('active_minutes', 0) or 0),
+                    'calories_burned': float(data.get('calories_burned', 0) or 0),
+                    'heart_rate_avg': int(data.get('heart_rate_avg', 0) or 0),
+                    'heart_rate_max': int(data.get('heart_rate_max', 0) or 0),
+                    'heart_rate_min': int(data.get('heart_rate_min', 0) or 0),
+                    'sleep_duration_minutes': int(data.get('sleep_duration_minutes', 0) or 0),
+                    'deep_sleep_minutes': int(data.get('deep_sleep_minutes', 0) or 0),
+                    'light_sleep_minutes': int(data.get('light_sleep_minutes', 0) or 0),
+                    'rem_sleep_minutes': int(data.get('rem_sleep_minutes', 0) or 0),
+                },
+            )
+            if not created:
+                health_data.steps = int(data.get('steps', health_data.steps) or 0)
+                health_data.step_goal = int(data.get('step_goal', health_data.step_goal) or 8000)
+                health_data.active_minutes = int(data.get('active_minutes', health_data.active_minutes) or 0)
+                health_data.calories_burned = float(data.get('calories_burned', health_data.calories_burned) or 0)
+                health_data.heart_rate_avg = int(data.get('heart_rate_avg', health_data.heart_rate_avg) or 0)
+                health_data.heart_rate_max = int(data.get('heart_rate_max', health_data.heart_rate_max) or 0)
+                health_data.heart_rate_min = int(data.get('heart_rate_min', health_data.heart_rate_min) or 0)
+                health_data.sleep_duration_minutes = int(
+                    data.get('sleep_duration_minutes', health_data.sleep_duration_minutes) or 0
+                )
+                health_data.deep_sleep_minutes = int(data.get('deep_sleep_minutes', health_data.deep_sleep_minutes) or 0)
+                health_data.light_sleep_minutes = int(
+                    data.get('light_sleep_minutes', health_data.light_sleep_minutes) or 0
+                )
+                health_data.rem_sleep_minutes = int(data.get('rem_sleep_minutes', health_data.rem_sleep_minutes) or 0)
+                health_data.save()
+            return JsonResponse({'success': True, 'message': '数据已保存'})
+        except (TypeError, ValueError) as e:
+            return JsonResponse({'success': False, 'message': str(e)})
+
+    try:
+        steps = int(request.POST.get('steps', 0))
+        step_goal = int(request.POST.get('step_goal', 8000))
+        active_minutes = int(request.POST.get('active_minutes', 0))
+        calories_burned = float(request.POST.get('calories_burned', 0))
+        heart_rate_avg = int(request.POST.get('heart_rate_avg', 0))
+        heart_rate_max = int(request.POST.get('heart_rate_max', 0))
+        heart_rate_min = int(request.POST.get('heart_rate_min', 0))
+        sleep_hours = int(request.POST.get('sleep_hours', 0))
+        sleep_minutes = int(request.POST.get('sleep_minutes', 0))
+        sleep_duration_minutes = sleep_hours * 60 + sleep_minutes
+        deep_sleep_hours = int(request.POST.get('deep_sleep_hours', 0))
+        deep_sleep_minutes = int(request.POST.get('deep_sleep_minutes', 0))
+        deep_sleep_minutes = deep_sleep_hours * 60 + deep_sleep_minutes
+        light_sleep_hours = int(request.POST.get('light_sleep_hours', 0))
+        light_sleep_minutes = int(request.POST.get('light_sleep_minutes', 0))
+        light_sleep_minutes = light_sleep_hours * 60 + light_sleep_minutes
+        rem_sleep_hours = int(request.POST.get('rem_sleep_hours', 0))
+        rem_sleep_minutes = int(request.POST.get('rem_sleep_minutes', 0))
+        rem_sleep_minutes = rem_sleep_hours * 60 + rem_sleep_minutes
 
         health_data, created = HealthData.objects.get_or_create(
             child=child,
             date=today,
             defaults={
-                'steps': data.get('steps', 0),
-                'step_goal': data.get('step_goal', 8000),
-                'active_minutes': data.get('active_minutes', 0),
-                'calories_burned': data.get('calories_burned', 0),
-                'heart_rate_avg': data.get('heart_rate_avg', 0),
-                'heart_rate_max': data.get('heart_rate_max', 0),
-                'heart_rate_min': data.get('heart_rate_min', 0),
-                'sleep_duration_minutes': data.get('sleep_duration_minutes', 0),
-                'deep_sleep_minutes': data.get('deep_sleep_minutes', 0),
-                'light_sleep_minutes': data.get('light_sleep_minutes', 0),
-                'rem_sleep_minutes': data.get('rem_sleep_minutes', 0),
-            }
+                'steps': steps,
+                'step_goal': step_goal,
+                'active_minutes': active_minutes,
+                'calories_burned': calories_burned,
+                'heart_rate_avg': heart_rate_avg,
+                'heart_rate_max': heart_rate_max,
+                'heart_rate_min': heart_rate_min,
+                'sleep_duration_minutes': sleep_duration_minutes,
+                'deep_sleep_minutes': deep_sleep_minutes,
+                'light_sleep_minutes': light_sleep_minutes,
+                'rem_sleep_minutes': rem_sleep_minutes,
+            },
         )
 
         if not created:
-            health_data.steps = data.get('steps', health_data.steps)
-            health_data.step_goal = data.get('step_goal', health_data.step_goal)
-            health_data.active_minutes = data.get('active_minutes', health_data.active_minutes)
-            health_data.calories_burned = data.get('calories_burned', health_data.calories_burned)
-            health_data.heart_rate_avg = data.get('heart_rate_avg', health_data.heart_rate_avg)
-            health_data.heart_rate_max = data.get('heart_rate_max', health_data.heart_rate_max)
-            health_data.heart_rate_min = data.get('heart_rate_min', health_data.heart_rate_min)
-            health_data.sleep_duration_minutes = data.get('sleep_duration_minutes', health_data.sleep_duration_minutes)
-            health_data.deep_sleep_minutes = data.get('deep_sleep_minutes', health_data.deep_sleep_minutes)
-            health_data.light_sleep_minutes = data.get('light_sleep_minutes', health_data.light_sleep_minutes)
-            health_data.rem_sleep_minutes = data.get('rem_sleep_minutes', health_data.rem_sleep_minutes)
+            health_data.steps = steps
+            health_data.step_goal = step_goal
+            health_data.active_minutes = active_minutes
+            health_data.calories_burned = calories_burned
+            health_data.heart_rate_avg = heart_rate_avg
+            health_data.heart_rate_max = heart_rate_max
+            health_data.heart_rate_min = heart_rate_min
+            health_data.sleep_duration_minutes = sleep_duration_minutes
+            health_data.deep_sleep_minutes = deep_sleep_minutes
+            health_data.light_sleep_minutes = light_sleep_minutes
+            health_data.rem_sleep_minutes = rem_sleep_minutes
             health_data.save()
 
-        return JsonResponse({'success': True, 'message': '数据已保存'})
-
-    except json.JSONDecodeError:
-        return JsonResponse({'success': False, 'message': '无效的JSON数据'})
-    except Exception as e:
-        return JsonResponse({'success': False, 'message': str(e)})
+        return JsonResponse({'success': True, 'message': '健康数据已保存'})
+    except ValueError:
+        return JsonResponse({'success': False, 'message': '请输入有效的数字'})
 
 
 @login_required
@@ -1996,79 +2055,6 @@ def health_auto_generate(request):
             'rem_sleep_minutes': rem_sleep_minutes,
         }
     })
-
-
-@login_required
-@require_http_methods(["POST"])
-def health_manual_input(request):
-    """手动输入健康数据"""
-    child = Child.objects.filter(user=request.user).first()
-    if not child:
-        return JsonResponse({'success': False, 'message': '未找到孩子信息'})
-
-    today = timezone.now().date()
-
-    try:
-        steps = int(request.POST.get('steps', 0))
-        step_goal = int(request.POST.get('step_goal', 8000))
-        active_minutes = int(request.POST.get('active_minutes', 0))
-        calories_burned = float(request.POST.get('calories_burned', 0))
-        heart_rate_avg = int(request.POST.get('heart_rate_avg', 0))
-        heart_rate_max = int(request.POST.get('heart_rate_max', 0))
-        heart_rate_min = int(request.POST.get('heart_rate_min', 0))
-        sleep_hours = int(request.POST.get('sleep_hours', 0))
-        sleep_minutes = int(request.POST.get('sleep_minutes', 0))
-        sleep_duration_minutes = sleep_hours * 60 + sleep_minutes
-        deep_sleep_hours = int(request.POST.get('deep_sleep_hours', 0))
-        deep_sleep_minutes = int(request.POST.get('deep_sleep_minutes', 0))
-        deep_sleep_minutes = deep_sleep_hours * 60 + deep_sleep_minutes
-        light_sleep_hours = int(request.POST.get('light_sleep_hours', 0))
-        light_sleep_minutes = int(request.POST.get('light_sleep_minutes', 0))
-        light_sleep_minutes = light_sleep_hours * 60 + light_sleep_minutes
-        rem_sleep_hours = int(request.POST.get('rem_sleep_hours', 0))
-        rem_sleep_minutes = int(request.POST.get('rem_sleep_minutes', 0))
-        rem_sleep_minutes = rem_sleep_hours * 60 + rem_sleep_minutes
-
-        # 创建或更新健康数据
-        health_data, created = HealthData.objects.get_or_create(
-            child=child,
-            date=today,
-            defaults={
-                'steps': steps,
-                'step_goal': step_goal,
-                'active_minutes': active_minutes,
-                'calories_burned': calories_burned,
-                'heart_rate_avg': heart_rate_avg,
-                'heart_rate_max': heart_rate_max,
-                'heart_rate_min': heart_rate_min,
-                'sleep_duration_minutes': sleep_duration_minutes,
-                'deep_sleep_minutes': deep_sleep_minutes,
-                'light_sleep_minutes': light_sleep_minutes,
-                'rem_sleep_minutes': rem_sleep_minutes,
-            }
-        )
-
-        if not created:
-            health_data.steps = steps
-            health_data.step_goal = step_goal
-            health_data.active_minutes = active_minutes
-            health_data.calories_burned = calories_burned
-            health_data.heart_rate_avg = heart_rate_avg
-            health_data.heart_rate_max = heart_rate_max
-            health_data.heart_rate_min = heart_rate_min
-            health_data.sleep_duration_minutes = sleep_duration_minutes
-            health_data.deep_sleep_minutes = deep_sleep_minutes
-            health_data.light_sleep_minutes = light_sleep_minutes
-            health_data.rem_sleep_minutes = rem_sleep_minutes
-            health_data.save()
-
-        return JsonResponse({
-            'success': True,
-            'message': '健康数据已保存'
-        })
-
-    except ValueError:
-        return JsonResponse({'success': False, 'message': '请输入有效的数字'})
 
 
 # ========== 学校端视图 ==========
