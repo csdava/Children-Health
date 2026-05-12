@@ -39,4 +39,11 @@ urlpatterns = [
     path('school/create-activity/', views.school_create_activity, name='school_create_activity'),
     path('school/create-challenge/', views.school_create_challenge, name='school_create_challenge'),
     path('school/class-stats/', views.school_class_stats, name='school_class_stats'),
+    path('school/challenge/<int:pk>/stats/', views.school_challenge_stats, name='school_challenge_stats'),
+    path('school/challenge/<int:pk>/finalize/', views.school_challenge_finalize, name='school_challenge_finalize'),
+    path('school/resource/create/', views.school_resource_create, name='school_resource_create'),
+    path('school/resource/<int:pk>/push/', views.school_resource_push, name='school_resource_push'),
+    path('school/resource/resync/', views.school_resource_resync, name='school_resource_resync'),
+    path('school/message/create/', views.school_message_create, name='school_message_create'),
+    path('school/archive/create/', views.school_archive_create, name='school_archive_create'),
 ]

@@ -1,3 +1,6 @@
+import hashlib
+import json
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -5,12 +8,14 @@ from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.utils import timezone
-from django.db.models import Count, Q, Sum
+from django.db.models import Count, Q, Sum, Avg
 from datetime import timedelta
 from .models import (
     Child, Task, TaskRecord, Encouragement, Teacher, ClassStudent, Activity,
     FoodMaterial, MealRecord, MealFoodItem, Badge, ChildBadge, Recipe,
-    HealthChallenge, ChallengeProgress, School
+    HealthChallenge, ChallengeProgress, School,
+    HealthCourseResource, HealthResourceUnlock,
+    SchoolHomeMessage, SchoolHealthArchive,
 )
 
 
@@ -1001,10 +1006,239 @@ def parent_bind_child(request):
 
 # ========== 学校端视图 ==========
 
+
+def _school_anon_label(child_id, scope_id):
+    digest = hashlib.sha256(f'{child_id}-{scope_id}-campus'.encode()).hexdigest()[:5].upper()
+    return f'匿名 · {digest}'
+
+
+def _teacher_class_children(teacher):
+    return Child.objects.filter(class_enrollments__teacher=teacher).distinct()
+
+
+def _challenge_audience_children(challenge):
+    if challenge.scope == 'school':
+        t_ids = Teacher.objects.filter(school=challenge.teacher.school).values_list('id', flat=True)
+        return Child.objects.filter(class_enrollments__teacher_id__in=t_ids).distinct()
+    return _teacher_class_children(challenge.teacher)
+
+
+def _challenge_progress_count(challenge, child):
+    """在挑战时间窗口内，根据类型统计进度（仅读既有膳食/任务数据，不改儿童端逻辑）。"""
+    today = timezone.now().date()
+    end = min(challenge.end_date, today)
+    start = challenge.start_date
+    if end < start:
+        return 0
+    ctype = (challenge.challenge_type or '').lower()
+    if ctype in ('nutrition', 'meal', 'diet', 'grain', '全谷物'):
+        days = MealRecord.objects.filter(
+            child=child, date__gte=start, date__lte=end
+        ).values_list('date', flat=True).distinct()
+        return len(set(days))
+    if ctype in ('exercise', 'sport', '运动'):
+        return TaskRecord.objects.filter(
+            child=child, task__code='exercise',
+            date__gte=start, date__lte=end, status='completed',
+        ).count()
+    if ctype in ('vegetable', 'veggie', '蔬菜', '彩虹'):
+        return TaskRecord.objects.filter(
+            child=child, task__code='veggie',
+            date__gte=start, date__lte=end, status='completed',
+        ).count()
+    if ctype in ('sleep', '早睡'):
+        return TaskRecord.objects.filter(
+            child=child, task__code='sleep',
+            date__gte=start, date__lte=end, status='completed',
+        ).count()
+    if ctype in ('wash', '卫生', '洗手'):
+        return TaskRecord.objects.filter(
+            child=child, task__code='wash',
+            date__gte=start, date__lte=end, status='completed',
+        ).count()
+    return TaskRecord.objects.filter(
+        child=child, date__gte=start, date__lte=end, status='completed'
+    ).count()
+
+
+def _challenge_stats_bundle(challenge, anon_scope):
+    children = _challenge_audience_children(challenge)
+    total = children.count()
+    rows = []
+    completed = 0
+    target = max(challenge.target_value, 1)
+    for child in children:
+        raw = _challenge_progress_count(challenge, child)
+        pct = min(100, int(raw / target * 100))
+        done = raw >= challenge.target_value
+        if done:
+            completed += 1
+        rows.append({
+            'anon': _school_anon_label(child.id, anon_scope.id),
+            'progress': raw,
+            'percent': pct,
+            'done': done,
+        })
+    rows.sort(key=lambda x: -x['progress'])
+    return {
+        'student_count': total,
+        'completed_count': completed,
+        'completion_rate': round(completed / total * 100, 1) if total else 0.0,
+        'avg_progress_percent': round(sum(r['percent'] for r in rows) / len(rows), 1) if rows else 0.0,
+        'leaderboard': rows[:25],
+    }
+
+
+def _class_health_overview(teacher, days=7):
+    today = timezone.now().date()
+    start = today - timedelta(days=days - 1)
+    children = _teacher_class_children(teacher)
+    child_ids = list(children.values_list('id', flat=True))
+    n = len(child_ids)
+    if n == 0:
+        return {
+            'period_days': days,
+            'avg_protein': 0.0,
+            'avg_carbohydrate': 0.0,
+            'avg_fat': 0.0,
+            'avg_calories': 0.0,
+            'food_diversity_index': 0.0,
+            'meal_checkin_rate': 0.0,
+            'task_pass_rate': 0.0,
+        }
+    meals = MealRecord.objects.filter(child_id__in=child_ids, date__gte=start, date__lte=today)
+    agg = meals.aggregate(
+        Avg('total_protein'),
+        Avg('total_carbohydrate'),
+        Avg('total_fat'),
+        Avg('total_calories'),
+    )
+    diversity_scores = []
+    for child in children:
+        dcount = MealFoodItem.objects.filter(
+            meal_record__child=child,
+            meal_record__date__gte=start,
+            meal_record__date__lte=today,
+        ).values('food__category').distinct().count()
+        diversity_scores.append(min(100.0, dcount / 5.0 * 100.0))
+    diversity = round(sum(diversity_scores) / len(diversity_scores), 1) if diversity_scores else 0.0
+    expected_child_days = n * days
+    checkins = 0
+    for child in children:
+        checkins += MealRecord.objects.filter(
+            child=child, date__gte=start, date__lte=today
+        ).values('date').distinct().count()
+    meal_rate = round(checkins / expected_child_days * 100, 1) if expected_child_days else 0.0
+    tasks = Task.objects.all()
+    task_rates = []
+    for task in tasks:
+        denom = n * days
+        num = TaskRecord.objects.filter(
+            child_id__in=child_ids, task=task,
+            date__gte=start, date__lte=today, status='completed',
+        ).count()
+        task_rates.append(num / denom * 100 if denom else 0)
+    task_pass = round(sum(task_rates) / len(task_rates), 1) if task_rates else 0.0
+    return {
+        'period_days': days,
+        'avg_protein': round(agg['total_protein__avg'] or 0, 1),
+        'avg_carbohydrate': round(agg['total_carbohydrate__avg'] or 0, 1),
+        'avg_fat': round(agg['total_fat__avg'] or 0, 1),
+        'avg_calories': round(agg['total_calories__avg'] or 0, 1),
+        'food_diversity_index': diversity,
+        'meal_checkin_rate': meal_rate,
+        'task_pass_rate': task_pass,
+    }
+
+
+def _anonymous_health_ranking(teacher, days=7):
+    today = timezone.now().date()
+    start = today - timedelta(days=days - 1)
+    ranked = []
+    for child in _teacher_class_children(teacher):
+        meals_n = MealRecord.objects.filter(
+            child=child, date__gte=start, date__lte=today
+        ).count()
+        task_n = TaskRecord.objects.filter(
+            child=child, date__gte=start, date__lte=today, status='completed'
+        ).count()
+        cats = MealFoodItem.objects.filter(
+            meal_record__child=child,
+            meal_record__date__gte=start,
+            meal_record__date__lte=today,
+        ).values('food__category').distinct().count()
+        score = task_n * 10 + meals_n * 5 + cats * 8
+        ranked.append({
+            'anon': _school_anon_label(child.id, teacher.id),
+            'score': score,
+            'tasks_ok': task_n,
+            'meal_logs': meals_n,
+            'food_categories': cats,
+        })
+    ranked.sort(key=lambda x: -x['score'])
+    for i, row in enumerate(ranked, 1):
+        row['rank'] = i
+    return ranked
+
+
+def _desensitized_alerts(teacher):
+    today = timezone.now().date()
+    week_ago = today - timedelta(days=7)
+    three_ago = today - timedelta(days=3)
+    alerts = []
+    for child in _teacher_class_children(teacher):
+        label = _school_anon_label(child.id, teacher.id)
+        recent_meals = MealRecord.objects.filter(child=child, date__gte=three_ago, date__lte=today).count()
+        if recent_meals == 0:
+            alerts.append({
+                'level': 'high',
+                'type': '膳食打卡异常',
+                'anon': label,
+                'text': '近 3 日未见膳食记录，建议关注家庭端配合。',
+            })
+        week_tasks = TaskRecord.objects.filter(
+            child=child, date__gte=week_ago, date__lte=today, status='completed'
+        ).count()
+        if week_tasks < 2:
+            alerts.append({
+                'level': 'medium',
+                'type': '健康任务偏低',
+                'anon': label,
+                'text': '近一周任务完成次数偏少，可进行个体化沟通。',
+            })
+        wmeals = MealRecord.objects.filter(child=child, date__gte=week_ago, date__lte=today)
+        if wmeals.exists():
+            avg_cal = wmeals.aggregate(Avg('total_calories'))['total_calories__avg'] or 0
+            if 0 < avg_cal < 350:
+                alerts.append({
+                    'level': 'medium',
+                    'type': '热量估算偏低',
+                    'anon': label,
+                    'text': '周均膳食热量估算偏低，可结合营养师建议随访。',
+                })
+    return alerts
+
+
+def _sync_resource_unlocks(resource):
+    children = _teacher_class_children(resource.teacher)
+    if not resource.unlock_requires_task:
+        for child in children:
+            HealthResourceUnlock.objects.get_or_create(resource=resource, child=child)
+        return
+    if not resource.pushed_at:
+        return
+    since = resource.pushed_at.date()
+    for child in children:
+        if TaskRecord.objects.filter(
+            child=child, date__gte=since, status='completed'
+        ).exists():
+            HealthResourceUnlock.objects.get_or_create(resource=resource, child=child)
+
+
 @login_required
 @user_passes_test(is_teacher)
 def school_dashboard(request):
-    """学校端首页"""
+    """学校端首页 — 校园健康教育管理中枢"""
     teacher = request.user.teacher_profile
     today = timezone.now().date()
     week_ago = today - timedelta(days=7)
@@ -1053,7 +1287,34 @@ def school_dashboard(request):
             })
 
     activities = Activity.objects.filter(is_active=True)[:5]
-    challenges = HealthChallenge.objects.filter(teacher=teacher, status='active')[:5]
+    challenges = HealthChallenge.objects.filter(teacher=teacher).order_by('-created_at')[:25]
+    challenge_stats = {c.id: _challenge_stats_bundle(c, teacher) for c in challenges}
+    challenges_with_stats = [{'challenge': c, 'stats': challenge_stats[c.id]} for c in challenges]
+
+    overview = _class_health_overview(teacher)
+    acal = overview['avg_calories'] or 0
+    overview['bar_calories_pct'] = min(100, int(acal / 6)) if acal else 0
+    overview['bar_protein_pct'] = min(100, int((overview['avg_protein'] or 0) / 0.5))
+    overview['bar_carb_pct'] = min(100, int((overview['avg_carbohydrate'] or 0) / 0.8))
+    anon_ranking = _anonymous_health_ranking(teacher)
+    alerts = _desensitized_alerts(teacher)
+
+    resources = HealthCourseResource.objects.filter(teacher=teacher).order_by('-created_at')[:40]
+    resource_rows = []
+    class_size = _teacher_class_children(teacher).count()
+    for r in resources:
+        unlocked = r.unlocks.count()
+        resource_rows.append({
+            'obj': r,
+            'unlocked': unlocked,
+            'class_size': class_size,
+            'unlock_pct': round(unlocked / class_size * 100, 1) if class_size else 0.0,
+        })
+
+    messages = SchoolHomeMessage.objects.filter(teacher=teacher)[:40]
+    archives = SchoolHealthArchive.objects.filter(teacher=teacher)[:20]
+
+    school_peer_teachers = Teacher.objects.filter(school=teacher.school).exclude(pk=teacher.pk)
 
     return render(request, 'school/dashboard.html', {
         'teacher': teacher,
@@ -1061,7 +1322,16 @@ def school_dashboard(request):
         'all_pending': all_pending,
         'activities': activities,
         'challenges': challenges,
+        'challenges_with_stats': challenges_with_stats,
+        'challenge_stats': challenge_stats,
         'total_tasks': total_tasks,
+        'overview': overview,
+        'anon_ranking': anon_ranking,
+        'alerts': alerts,
+        'resource_rows': resource_rows,
+        'messages': messages,
+        'archives': archives,
+        'school_peer_teachers': school_peer_teachers,
     })
 
 
@@ -1071,9 +1341,19 @@ def school_dashboard(request):
 def school_create_activity(request):
     """学校端创建活动"""
     teacher = request.user.teacher_profile
-    title = request.POST.get('title', '').strip()
-    content = request.POST.get('content', '').strip()
-    activity_type = request.POST.get('activity_type', 'challenge')
+    title = content = activity_type = None
+    if request.content_type and 'application/json' in request.content_type:
+        try:
+            payload = json.loads(request.body or '{}')
+        except json.JSONDecodeError:
+            return JsonResponse({'success': False, 'message': 'JSON 无效'})
+        title = (payload.get('title') or '').strip()
+        content = (payload.get('content') or '').strip()
+        activity_type = (payload.get('activity_type') or 'challenge').strip()
+    else:
+        title = request.POST.get('title', '').strip()
+        content = request.POST.get('content', '').strip()
+        activity_type = request.POST.get('activity_type', 'challenge')
 
     if not title or not content:
         return JsonResponse({'success': False, 'message': '标题和内容不能为空'})
@@ -1101,6 +1381,12 @@ def school_create_challenge(request):
     end_date = request.POST.get('end_date')
     target_value = int(request.POST.get('target_value', 7))
     power_reward = int(request.POST.get('power_reward', 50))
+    scope = request.POST.get('scope', 'class')
+    rule_description = request.POST.get('rule_description', '').strip()
+    reward_description = request.POST.get('reward_description', '').strip()
+
+    if scope not in ('class', 'school'):
+        scope = 'class'
 
     if not title or not description or not start_date or not end_date:
         return JsonResponse({'success': False, 'message': '请填写完整信息'})
@@ -1109,7 +1395,7 @@ def school_create_challenge(request):
     start = datetime.strptime(start_date, '%Y-%m-%d').date()
     end = datetime.strptime(end_date, '%Y-%m-%d').date()
 
-    challenge = HealthChallenge.objects.create(
+    HealthChallenge.objects.create(
         teacher=teacher,
         title=title,
         description=description,
@@ -1117,7 +1403,10 @@ def school_create_challenge(request):
         start_date=start,
         end_date=end,
         target_value=target_value,
-        power_reward=power_reward
+        power_reward=power_reward,
+        scope=scope,
+        rule_description=rule_description,
+        reward_description=reward_description,
     )
 
     return JsonResponse({'success': True, 'message': '挑战赛已发布'})
@@ -1126,8 +1415,9 @@ def school_create_challenge(request):
 @login_required
 @user_passes_test(is_teacher)
 def school_class_stats(request):
-    """班级统计数据"""
+    """班级统计数据（膳食与任务，供看板图表）"""
     teacher = request.user.teacher_profile
+    overview = _class_health_overview(teacher)
     today = timezone.now().date()
     week_ago = today - timedelta(days=7)
 
@@ -1159,8 +1449,127 @@ def school_class_stats(request):
 
     return JsonResponse({
         'task_stats': task_stats,
-        'overall_rate': round(overall_rate, 1)
+        'overall_rate': round(overall_rate, 1),
+        'overview': overview,
     })
+
+
+@login_required
+@user_passes_test(is_teacher)
+def school_challenge_stats(request, pk):
+    teacher = request.user.teacher_profile
+    challenge = get_object_or_404(HealthChallenge, pk=pk, teacher=teacher)
+    bundle = _challenge_stats_bundle(challenge, teacher)
+    return JsonResponse(bundle)
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_challenge_finalize(request, pk):
+    """结束挑战并生成总结报告（存于 HealthChallenge.summary_report）"""
+    teacher = request.user.teacher_profile
+    challenge = get_object_or_404(HealthChallenge, pk=pk, teacher=teacher)
+    bundle = _challenge_stats_bundle(challenge, teacher)
+    custom = request.POST.get('summary', '').strip()
+    auto = (
+        f"【{challenge.title}】挑战总结\n"
+        f"范围：{challenge.get_scope_display()}\n"
+        f"时间：{challenge.start_date} ~ {challenge.end_date}\n"
+        f"参与席位：{bundle['student_count']}，达标：{bundle['completed_count']}\n"
+        f"班级达标率：{bundle['completion_rate']}%，平均完成度：{bundle['avg_progress_percent']}%\n"
+        f"规则回顾：{challenge.rule_description or '—'}\n"
+        f"奖励说明：{challenge.reward_description or '—'}"
+    )
+    challenge.summary_report = custom or auto
+    challenge.status = 'completed'
+    challenge.save()
+    return JsonResponse({'success': True, 'summary': challenge.summary_report})
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_resource_create(request):
+    teacher = request.user.teacher_profile
+    title = request.POST.get('title', '').strip()
+    resource_type = request.POST.get('resource_type', 'article')
+    summary = request.POST.get('summary', '').strip()
+    content = request.POST.get('content', '').strip()
+    media_url = request.POST.get('media_url', '').strip()
+    unlock_requires_task = request.POST.get('unlock_requires_task', '1') == '1'
+    if not title:
+        return JsonResponse({'success': False, 'message': '标题必填'})
+    resource = HealthCourseResource.objects.create(
+        teacher=teacher,
+        title=title,
+        resource_type=resource_type,
+        summary=summary,
+        content=content,
+        media_url=media_url,
+        unlock_requires_task=unlock_requires_task,
+    )
+    return JsonResponse({'success': True, 'id': resource.id})
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_resource_push(request, pk):
+    teacher = request.user.teacher_profile
+    resource = get_object_or_404(HealthCourseResource, pk=pk, teacher=teacher)
+    resource.pushed_at = timezone.now()
+    resource.save()
+    _sync_resource_unlocks(resource)
+    return JsonResponse({'success': True, 'message': '已推送至本班家庭端可见队列，并同步打卡解锁'})
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_resource_resync(request):
+    teacher = request.user.teacher_profile
+    rid = request.POST.get('resource_id')
+    resource = get_object_or_404(HealthCourseResource, pk=rid, teacher=teacher)
+    _sync_resource_unlocks(resource)
+    return JsonResponse({'success': True, 'unlocked_count': resource.unlocks.count()})
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_message_create(request):
+    teacher = request.user.teacher_profile
+    title = request.POST.get('title', '').strip()
+    body = request.POST.get('body', '').strip()
+    if not title or not body:
+        return JsonResponse({'success': False, 'message': '请填写主题与沟通要点'})
+    SchoolHomeMessage.objects.create(teacher=teacher, title=title, body=body)
+    return JsonResponse({'success': True})
+
+
+@login_required
+@user_passes_test(is_teacher)
+@require_http_methods(['POST'])
+def school_archive_create(request):
+    teacher = request.user.teacher_profile
+    title = request.POST.get('title', '').strip()
+    if not title:
+        title = timezone.now().strftime('健康教育归档 %Y-%m-%d %H:%M')
+    overview = _class_health_overview(teacher)
+    ranking_sample = _anonymous_health_ranking(teacher)[:10]
+    alerts = _desensitized_alerts(teacher)
+    payload = {
+        'overview': overview,
+        'ranking_sample': ranking_sample,
+        'alerts_count': len(alerts),
+    }
+    SchoolHealthArchive.objects.create(
+        teacher=teacher,
+        title=title,
+        snapshot_json=json.dumps(payload, ensure_ascii=False),
+    )
+    return JsonResponse({'success': True})
 
 
 # ========== 管理视图 ==========
