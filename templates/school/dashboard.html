@@ -253,8 +253,7 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
     <button type="button" class="tab" onclick="switchTab(event, 'comm')">家校沟通</button>
     <button type="button" class="tab" onclick="switchTab(event, 'archive')">数据归档</button>
     <button type="button" class="tab" onclick="switchTab(event, 'students')">班级名册</button>
-    <button type="button" class="tab" onclick="switchTab(event, 'activities')">活动快讯</button>
-</div>
+    </div>
 
 <div id="tab-hub">
     <div class="grid-2">
@@ -328,7 +327,7 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
                     {% if challenge.summary_report %}
                     <details style="margin-top:10px;">
                         <summary style="cursor:pointer;font-size:13px;color:#7B1FA2">查看总结报告</summary>
-                        <pre class="report">{{ challenge.summary_report }}</pre>
+                        <pre class="report">{{ challenge.summary_report|escape }}</pre>
                     </details>
                     {% endif %}
                 </div>
@@ -346,7 +345,7 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
         <div class="card">
             <div class="card-header"><div class="card-title">上传 / 登记健康课程资源</div></div>
             <div class="card-body">
-                <form onsubmit="createResource(event)">
+                <form onsubmit="createResource(event)" enctype="multipart/form-data">
                     <div class="form-grid">
                         <input type="text" id="resTitle" class="form-input" placeholder="资源标题" required>
                         <select id="resType" class="form-select">
@@ -355,7 +354,7 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
                             <option value="ppt">课件资料</option>
                             <option value="mixed">混合</option>
                         </select>
-                        <input type="url" id="resMedia" class="form-input form-full" placeholder="视频或附件 URL（可选）">
+                        <input type="file" id="resMedia" class="form-input form-full" accept="video/*,audio/*,image/*,.pdf,.ppt,.pptx,.doc,.docx">
                         <label class="form-full" style="font-size:13px;display:flex;align-items:center;gap:8px;">
                             <input type="checkbox" id="resUnlock" checked> 学生需完成健康打卡后解锁内容
                         </label>
@@ -446,7 +445,8 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
             <div class="challenge-item" style="border-left-color:#6d4c41;">
                 <div class="challenge-title">{{ a.title }}</div>
                 <div style="font-size:12px;color:#888;">{{ a.created_at|date:"Y-m-d H:i" }}</div>
-                <pre class="report">{{ a.snapshot_json|truncatechars:400 }}</pre>
+                <pre class="report" id="archive-pre-{{ forloop.counter }}" style="display:none;"></pre>
+                <button type="button" class="btn btn-sm btn-outline" style="margin-top:6px;" onclick="toggleArchive({{ forloop.counter }}, '{{ a.snapshot_json|escapejs }}')">展开查看</button>
             </div>
             {% empty %}
             <div class="empty-state">尚无归档，点击上方生成。</div>
@@ -475,25 +475,32 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
                     <div class="student-weekly-export">
                         <div style="font-size:11px;color:#5e35b1;font-weight:600;margin-bottom:8px;text-align:center;">健康周报 PDF</div>
                         <div style="display:flex;flex-direction:column;gap:6px;">
-                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=7" class="btn btn-sm btn-primary" target="_blank" rel="noopener">下载近 7 天</a>
-                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=14" class="btn btn-sm btn-outline" target="_blank" rel="noopener">下载近 14 天</a>
-                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=30" class="btn btn-sm btn-outline" target="_blank" rel="noopener">下载近 30 天</a>
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=7" class="btn btn-sm btn-primary">下载近 7 天</a>
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=14" class="btn btn-sm btn-outline">下载近 14 天</a>
+                            <a href="{% url 'school_export_weekly_pdf' %}?child_id={{ student.id }}&amp;days=30" class="btn btn-sm btn-outline">下载近 30 天</a>
                         </div>
                     </div>
                     <div style="font-size:11px;color:#666;margin-top:10px;padding-top:8px;border-top:1px solid #eee;line-height:1.5;">
                         {% if student.age_years is not None %}约 <strong>{{ student.age_years }}</strong> 周岁 · {% endif %}
                         {% if student.intake_recommendation %}
                         参考摄入（非医疗）：热量 {{ student.intake_recommendation.calories_kcal_min }}–{{ student.intake_recommendation.calories_kcal_max }} kcal/日，蛋白 {{ student.intake_recommendation.protein_g_min }}–{{ student.intake_recommendation.protein_g_max }} g/日。
+                        {% if student.today_meal_totals.count %}
+                        <div style="margin-top:6px;color:#2e7d32;">今日摄入：热量约 {{ student.today_meal_totals.kcal|floatformat:0 }} kcal，蛋白约 {{ student.today_meal_totals.protein|floatformat:1 }} g</div>
+                        {% endif %}
                         {% else %}
                         参考摄入需家长在家庭端填写<strong>出生日期</strong>后显示。
                         {% endif %}
                     </div>
-                    {% if student.allergy_tags %}
-                    <div style="font-size:11px;color:#b71c1c;margin-top:6px;"><strong>过敏</strong>：{% for t in student.allergy_tags %}{{ t }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
-                    {% endif %}
-                    {% if student.medical_tags %}
-                    <div style="font-size:11px;color:#1565c0;margin-top:4px;"><strong>医嘱/原则</strong>：{% for t in student.medical_tags %}{{ t }}{% if not forloop.last %}、{% endif %}{% endfor %}</div>
-                    {% endif %}
+                    <div style="margin-top:8px;padding:8px;background:#fff3e0;border-radius:8px;border:1px solid #ffb74d;">
+                        {% if student.allergy_tags %}
+                        <div style="font-size:12px;color:#b71c1c;"><strong>过敏</strong>：{% for t in student.allergy_tags %}<span style="background:#ffcdd2;padding:2px 6px;border-radius:4px;margin:2px;">{{ t }}</span>{% endfor %}</div>
+                        {% else %}
+                        <div style="font-size:11px;color:#999;">暂无过敏信息</div>
+                        {% endif %}
+                        {% if student.medical_tags %}
+                        <div style="font-size:12px;color:#1565c0;margin-top:4px;"><strong>医嘱</strong>：{% for t in student.medical_tags %}<span style="background:#e3f2fd;padding:2px 6px;border-radius:4px;margin:2px;">{{ t }}</span>{% endfor %}</div>
+                        {% endif %}
+                    </div>
                 </div>
                 {% empty %}
                 <div class="empty-state" style="grid-column:1/-1;">暂无学生</div>
@@ -503,34 +510,6 @@ pre.report { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; paddin
     </div>
 </div>
 
-<div id="tab-activities" style="display:none;">
-    <div class="card">
-        <div class="card-header"><div class="card-title">发布班级活动快讯</div></div>
-        <div class="card-body">
-            <form onsubmit="createActivity(event)">
-                <div class="form-grid">
-                    <input type="text" id="activityTitle" class="form-input" placeholder="标题" required>
-                    <select id="activityType" class="form-select">
-                        <option value="challenge">健康挑战</option>
-                        <option value="competition">班级比赛</option>
-                        <option value="education">健康教育</option>
-                    </select>
-                    <textarea id="activityContent" class="form-textarea form-full" placeholder="内容" required></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary" style="margin-top:12px;width:100%">发布</button>
-            </form>
-            {% if activities %}
-            <h4 style="margin:24px 0 12px;font-size:14px;color:#666">最近活动</h4>
-            {% for ac in activities %}
-            <div class="challenge-item">
-                <div class="challenge-title">{{ ac.title }}</div>
-                <div style="font-size:13px;color:#666;">{{ ac.content|truncatechars:80 }}</div>
-            </div>
-            {% endfor %}
-            {% endif %}
-        </div>
-    </div>
-</div>
 
 <div id="toast" style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 24px;border-radius:8px;display:none;z-index:1000;font-size:14px;"></div>
 
@@ -572,20 +551,6 @@ function postForm(url, data) {
         body
     }).then(r => r.json());
 }
-function createActivity(e) {
-    e.preventDefault();
-    const title = document.getElementById('activityTitle').value;
-    const type = document.getElementById('activityType').value;
-    const content = document.getElementById('activityContent').value;
-    fetch('/school/create-activity/', {
-        method: 'POST',
-        headers: {'X-CSRFToken': getCookie('csrftoken'), 'Content-Type': 'application/json'},
-        body: JSON.stringify({title, activity_type: type, content})
-    }).then(r => r.json()).then(data => {
-        if (data.success) { showToast('活动已发布'); location.reload(); }
-        else showToast(data.message || '失败');
-    });
-}
 function createChallenge(e) {
     e.preventDefault();
     const title = document.getElementById('challengeTitle').value;
@@ -613,15 +578,19 @@ function finalizeChallenge(id) {
 }
 function createResource(e) {
     e.preventDefault();
-    const payload = {
-        title: document.getElementById('resTitle').value,
-        resource_type: document.getElementById('resType').value,
-        media_url: document.getElementById('resMedia').value,
-        summary: document.getElementById('resSummary').value,
-        content: document.getElementById('resContent').value,
-        unlock_requires_task: document.getElementById('resUnlock').checked ? '1' : '0'
-    };
-    postForm('/school/resource/create/', new URLSearchParams(payload)).then(data => {
+    const formData = new FormData();
+    formData.append('title', document.getElementById('resTitle').value);
+    formData.append('resource_type', document.getElementById('resType').value);
+    const mediaFile = document.getElementById('resMedia').files[0];
+    if (mediaFile) formData.append('media_file', mediaFile);
+    formData.append('summary', document.getElementById('resSummary').value);
+    formData.append('content', document.getElementById('resContent').value);
+    formData.append('unlock_requires_task', document.getElementById('resUnlock').checked ? '1' : '0');
+    fetch('/school/resource/create/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: formData
+    }).then(r => r.json()).then(data => {
         if (data.success) { showToast('资源已保存'); location.reload(); }
         else showToast(data.message || '失败');
     });
@@ -654,6 +623,55 @@ function saveArchive(e) {
         if (data.success) { showToast('归档已保存'); location.reload(); }
         else showToast(data.message || '失败');
     });
+}
+function toggleArchive(idx, jsonStr) {
+    const pre = document.getElementById('archive-pre-' + idx);
+    const btn = pre.nextElementSibling;
+    if (pre.style.display === 'none') {
+        try {
+            const obj = JSON.parse(jsonStr);
+            const zh = _translateArchive(obj);
+            pre.textContent = JSON.stringify(zh, null, 2);
+        } catch(e) {
+            pre.textContent = jsonStr;
+        }
+        pre.style.display = 'block';
+        btn.textContent = '收起';
+    } else {
+        pre.style.display = 'none';
+        btn.textContent = '展开查看';
+    }
+}
+function _translateArchive(obj) {
+    if (Array.isArray(obj)) return obj.map(_translateArchive);
+    if (obj === null || typeof obj !== 'object') return obj;
+    const keyMap = {
+        period_days: '统计天数',
+        avg_protein: '平均蛋白质(g)',
+        avg_carbohydrate: '平均碳水(g)',
+        avg_fat: '平均脂肪(g)',
+        avg_calories: '平均热量(kcal)',
+        food_diversity_index: '食物多样性指数',
+        meal_checkin_rate: '膳食打卡率(%)',
+        task_pass_rate: '任务达标率(%)',
+        ranking_sample: '排行样本',
+        anon: '匿名标识',
+        score: '综合分',
+        tasks_ok: '完成任务数',
+        meal_logs: '膳食记录条数',
+        food_categories: '食材种类数',
+        rank: '排名',
+        alerts_count: '预警数量',
+        level: '级别',
+        type: '类型',
+        text: '说明',
+    };
+    const out = {};
+    for (const k in obj) {
+        const newKey = keyMap[k] !== undefined ? keyMap[k] : k;
+        out[newKey] = _translateArchive(obj[k]);
+    }
+    return out;
 }
 function sendReminder() { showToast('已记录提醒（演示）'); }
 

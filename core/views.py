@@ -231,7 +231,15 @@ def child_dashboard(request):
 
     progress_percent = int((child.power / child.power_to_next) * 100)
 
-    today_meals = MealRecord.objects.filter(child=child, date=today)
+    today_meals = MealRecord.objects.filter(child=child, date=today).prefetch_related('food_items__food')
+    today_meal_totals = {'kcal': 0.0, 'protein': 0.0, 'carb': 0.0, 'fat': 0.0, 'count': 0}
+    for m in today_meals:
+        today_meal_totals['kcal'] += float(m.total_calories or 0)
+        today_meal_totals['protein'] += float(m.total_protein or 0)
+        today_meal_totals['carb'] += float(m.total_carbohydrate or 0)
+        today_meal_totals['fat'] += float(m.total_fat or 0)
+        today_meal_totals['count'] += 1
+
     badges = ChildBadge.objects.filter(child=child).select_related('badge')[:5]
 
     active_challenges = []
@@ -239,6 +247,23 @@ def child_dashboard(request):
         if progress.challenge.status == 'active':
             progress.percent = int(progress.current_value / progress.challenge.target_value * 100)
             active_challenges.append(progress)
+
+    family_health = _intake_and_tags_for_child(child)
+    family_health['today_meal_totals'] = today_meal_totals
+
+    allergy_tags = child.allergy_tags or []
+    for meal in today_meals:
+        meal.allergy_hits = []
+        if allergy_tags:
+            food_names = [str(fi.food.name) for fi in meal.food_items.all()]
+            for tag in allergy_tags:
+                tag = (str(tag) or "").strip()
+                if not tag:
+                    continue
+                for fname in food_names:
+                    if tag in fname:
+                        meal.allergy_hits.append({'tag': tag, 'food': fname})
+                        break
 
     return render(request, 'child/dashboard.html', {
         'child': child,
@@ -248,9 +273,10 @@ def child_dashboard(request):
         'latest_encouragement': latest_encouragement,
         'progress_percent': progress_percent,
         'today_meals': today_meals,
+        'today_meal_totals': today_meal_totals,
         'badges': badges,
         'active_challenges': active_challenges,
-        'family_health_readonly': _intake_and_tags_for_child(child),
+        'family_health_readonly': family_health,
     })
 
 
@@ -381,13 +407,18 @@ def yolo_recognize_food(request):
     # 保存图片到临时文件
     import os
     import tempfile
+    import logging
     from django.conf import settings
+
+    logger = logging.getLogger(__name__)
 
     # 创建临时文件保存上传的图片
     with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp:
         for chunk in image.chunks():
             tmp.write(chunk)
         tmp_path = tmp.name
+
+    logger.warning(f"[YOLO] Temp file: {tmp_path}, size: {os.path.getsize(tmp_path) if os.path.exists(tmp_path) else 'N/A'}")
 
     try:
         # 调用 YOLO 模型进行识别
@@ -398,17 +429,24 @@ def yolo_recognize_food(request):
 
         if os.path.exists(model_path):
             model = YOLO(model_path)
-            # 运行推理
-            results = model.predict(source=tmp_path, imgsz=640, conf=0.5, verbose=False)
+            # 运行推理 - 降低置信度阈值以获取更多检测结果
+            results = model.predict(source=tmp_path, imgsz=640, conf=0.25, verbose=False)
 
             # 解析识别结果
             recognized_foods = []
             if results and len(results) > 0:
                 result = results[0]
+                # 调试：打印检测到的类别和置信度
+                print(f"[DEBUG] YOLO detection - boxes: {result.boxes is not None}, count: {len(result.boxes) if result.boxes is not None else 0}")
                 if result.boxes is not None and len(result.boxes) > 0:
                     boxes = result.boxes
                     class_ids = boxes.cls.cpu().numpy().astype(int)
                     confidences = boxes.conf.cpu().numpy()
+
+                    # 调试：打印所有检测结果
+                    for class_id, conf in zip(class_ids, confidences):
+                        class_name = result.names[class_id] if class_id < len(result.names) else 'unknown'
+                        print(f"[DEBUG] Detected: {class_name}, conf: {conf:.3f}")
 
                     for class_id, conf in zip(class_ids, confidences):
                         if class_id < len(result.names):
@@ -425,8 +463,8 @@ def yolo_recognize_food(request):
                                     'fat': food_data['fat'],
                                     'calories': food_data['calories'],
                                 })
-                            elif class_name not in recognized_foods:
-                                # 使用默认数据
+                            elif class_name not in YOLO_CLASS_TO_FOOD:
+                                # 未映射的类别，使用默认数据
                                 food_data = DEFAULT_FOOD_DATA.get('vegetable', DEFAULT_FOOD_DATA['vegetable'])
                                 recognized_foods.append({
                                     'name': class_name.title(),
@@ -887,6 +925,22 @@ def parent_dashboard(request):
             })
         children_class_map[str(c.id)] = rows
 
+    # 获取学校发布的健康挑战（根据孩子所在的班级）
+    child_teacher_ids = list(ClassStudent.objects.filter(child=child).values_list('teacher_id', flat=True))
+    school_challenges = []
+    if child_teacher_ids:
+        from django.db.models import Q
+        school_challenges = list(
+            HealthChallenge.objects.filter(
+                Q(teacher_id__in=child_teacher_ids) | Q(scope='school'),
+                status='active'
+            ).select_related('teacher').order_by('-created_at')[:10]
+        )
+        for challenge in school_challenges:
+            progress = ChallengeProgress.objects.filter(child=child, challenge=challenge).first()
+            challenge.current_value = progress.current_value if progress else 0
+            challenge.is_completed = progress.is_completed if progress else False
+
     return render(request, 'parent/dashboard.html', {
         'child': child,
         'child_age_years': age_y,
@@ -903,6 +957,7 @@ def parent_dashboard(request):
         'parent_health_alerts': parent_health_alerts,
         'parent_alerts_unread': parent_alerts_unread,
         'children_class_map': children_class_map,
+        'school_challenges': school_challenges,
     })
 
 
@@ -1531,6 +1586,79 @@ def parent_recipe_create(request):
             'is_family_recipe': True,
             'created_by': request.user.username,
         },
+    })
+
+
+@login_required
+@require_http_methods(["POST"])
+def parent_recipe_batch_import(request):
+    """批量导入食谱（普通文字格式，每行一个食谱，格式：食谱名称|食材1,食材2,食材3）"""
+    from .recipe_nutrition_estimate import estimate_from_ingredients_text
+
+    if not is_parent(request.user):
+        return JsonResponse({'success': False, 'message': '仅限家长账号批量导入'}, status=403)
+
+    text = (request.POST.get('recipes_text') or '').strip()
+    if not text:
+        return JsonResponse({'success': False, 'message': '请输入食谱数据'}, status=400)
+
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    if not lines:
+        return JsonResponse({'success': False, 'message': '未提供食谱数据'}, status=400)
+
+    if len(lines) > 50:
+        return JsonResponse({'success': False, 'message': '单次最多导入 50 条食谱'}, status=400)
+
+    created = []
+    errors = []
+    existing = 0
+
+    for i, line in enumerate(lines):
+        parts = line.split('|')
+        if len(parts) < 2:
+            errors.append(f'第 {i+1} 行：格式错误，请用竖线分隔名称和食材，如：红烧冬瓜|冬瓜300g,瘦肉50g')
+            continue
+
+        name = parts[0].strip()
+        ingredients = parts[1].strip()
+
+        if not name or not ingredients:
+            errors.append(f'第 {i+1} 行：名称和食材清单不能为空')
+            continue
+
+        if len(name) > 100:
+            errors.append(f'第 {i+1} 行：食谱名称过长')
+            continue
+
+        if Recipe.objects.filter(name=name).exists():
+            existing += 1
+            continue
+
+        est = estimate_from_ingredients_text(ingredients)
+        target_nutrients = est.get('suggested_target_nutrients', '')[:100]
+
+        recipe = Recipe.objects.create(
+            name=name,
+            description='',
+            ingredients=ingredients,
+            steps='',
+            calories=est['calories'],
+            protein=est['protein'],
+            carbohydrate=est['carbohydrate'],
+            fat=est['fat'],
+            suitable_for='家庭端批量导入',
+            target_nutrients=target_nutrients,
+            created_by=request.user,
+        )
+        created.append({'id': recipe.id, 'name': recipe.name})
+
+    return JsonResponse({
+        'success': True,
+        'message': f'导入完成：成功 {len(created)} 条，跳过已存在 {existing} 条',
+        'created_count': len(created),
+        'existing_count': existing,
+        'errors': errors[:10],
+        'created': created[:20],
     })
 
 
@@ -2475,6 +2603,22 @@ def _desensitized_alerts(teacher):
     week_ago = today - timedelta(days=7)
     three_ago = today - timedelta(days=3)
     alerts = []
+    child_ids = list(ClassStudent.objects.filter(teacher=teacher).values_list('child_id', flat=True))
+
+    # 过敏预警：来自 HealthAlert（家长端/儿童端触发后上传）
+    for alert in HealthAlert.objects.filter(child_id__in=child_ids, alert_type='allergy').order_by('-created_at')[:20]:
+        child = alert.child
+        label = _school_anon_label(child.id, teacher.id)
+        hits = alert.payload.get('hits', []) if isinstance(alert.payload, dict) else []
+        tags = ', '.join(sorted({h['tag'] for h in hits})) if hits else ''
+        alerts.append({
+            'level': 'high',
+            'type': '过敏预警',
+            'anon': label,
+            'text': f"{alert.message or '检测到过敏原'}{'（' + tags + '）' if tags else ''}",
+            'child_id': child.id,
+        })
+
     for child in _teacher_class_children(teacher):
         label = _school_anon_label(child.id, teacher.id)
         recent_meals = MealRecord.objects.filter(child=child, date__gte=three_ago, date__lte=today).count()
@@ -2607,6 +2751,16 @@ def school_dashboard(request):
         avg_tasks = sum(student_tasks.values()) / 7 if student_tasks else 0
 
         hp = _intake_and_tags_for_child(child)
+
+        today_meals = MealRecord.objects.filter(child=child, date=today)
+        today_meal_totals = {'kcal': 0.0, 'protein': 0.0, 'carb': 0.0, 'fat': 0.0, 'count': 0}
+        for m in today_meals:
+            today_meal_totals['kcal'] += float(m.total_calories or 0)
+            today_meal_totals['protein'] += float(m.total_protein or 0)
+            today_meal_totals['carb'] += float(m.total_carbohydrate or 0)
+            today_meal_totals['fat'] += float(m.total_fat or 0)
+            today_meal_totals['count'] += 1
+
         students_data.append({
             'id': child.id,
             'nickname': child.nickname,
@@ -2616,6 +2770,7 @@ def school_dashboard(request):
             'daily_tasks': student_tasks,
             'age_years': hp['age_years'],
             'intake_recommendation': hp['recommendation'],
+            'today_meal_totals': today_meal_totals,
             'allergy_tags': hp['allergy_tags'],
             'medical_tags': hp['medical_tags'],
         })
@@ -2902,11 +3057,23 @@ def school_resource_create(request):
     resource_type = request.POST.get('resource_type', 'article')
     summary = request.POST.get('summary', '').strip()
     content = request.POST.get('content', '').strip()
+    media_file = request.FILES.get('media_file')
     media_url = request.POST.get('media_url', '').strip()
     unlock_requires_task = request.POST.get('unlock_requires_task', '1') == '1'
     if not title:
         return JsonResponse({'success': False, 'message': '标题必填'})
-    resource = HealthCourseResource.objects.create(
+    if media_file:
+        import os
+        from django.conf import settings
+        upload_dir = os.path.join(settings.MEDIA_ROOT, 'course_resources', str(teacher.id))
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = f"{timezone.now().strftime('%Y%m%d%H%M%S')}_{media_file.name}"
+        filepath = os.path.join(upload_dir, filename)
+        with open(filepath, 'wb') as f:
+            for chunk in media_file.chunks():
+                f.write(chunk)
+        media_url = f"/media/course_resources/{teacher.id}/{filename}"
+    HealthCourseResource.objects.create(
         teacher=teacher,
         title=title,
         resource_type=resource_type,
@@ -2915,7 +3082,7 @@ def school_resource_create(request):
         media_url=media_url,
         unlock_requires_task=unlock_requires_task,
     )
-    return JsonResponse({'success': True, 'id': resource.id})
+    return JsonResponse({'success': True})
 
 
 @login_required

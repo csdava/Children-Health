@@ -374,6 +374,23 @@
         border-bottom: 2px solid #f0f0f0;
     }
 
+    .nav-jump {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 16px;
+    }
+
+    .nav-jump a {
+        font-size: 13px;
+        color: #1976d2;
+        text-decoration: none;
+        padding: 6px 12px;
+        background: #fff;
+        border-radius: 20px;
+        border: 1px solid #e0e0e0;
+    }
+
     .task-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -783,6 +800,11 @@
         text-align: center;
     }
 
+    .meal-record-warning {
+        background: #fff3e0;
+        border: 2px solid #ff9800;
+    }
+
     .meal-type {
         font-size: 14px;
         color: #666;
@@ -1006,6 +1028,16 @@
         </div>
     </div>
 
+    <div class="nav-jump">
+        <a href="#sec-health">手环数据</a>
+        <a href="#sec-ai-meal">AI 膳食识别</a>
+        <a href="#sec-tasks">今日任务</a>
+        <a href="#sec-challenges">进行中的挑战</a>
+        <a href="#sec-badges">我的徽章</a>
+        <a href="#sec-encouragements">家长鼓励</a>
+        <a href="#sec-child-alerts">健康预警</a>
+    </div>
+
     {% if child.diet_notes %}
     <div class="parent-notes-card">
         <h3>家长备注（家庭端维护 · 只读）</h3>
@@ -1033,6 +1065,12 @@
             蛋白质约 <strong>{{ family_health_readonly.recommendation.protein_g_min }}–{{ family_health_readonly.recommendation.protein_g_max }}</strong> g/日。
             {{ family_health_readonly.recommendation.notes }}
         </p>
+        {% if family_health_readonly.today_meal_totals.count %}
+        <p style="margin-top:10px;padding-top:10px;border-top:1px dashed #a5d6a7;">
+            <strong>今日摄入对比：</strong>热量约 {{ family_health_readonly.today_meal_totals.kcal|floatformat:0 }} / {{ family_health_readonly.recommendation.calories_kcal_min }}–{{ family_health_readonly.recommendation.calories_kcal_max }} kcal，
+            蛋白质约 {{ family_health_readonly.today_meal_totals.protein|floatformat:1 }} / {{ family_health_readonly.recommendation.protein_g_min }}–{{ family_health_readonly.recommendation.protein_g_max }} g
+        </p>
+        {% endif %}
         {% else %}
         <p style="color:#666;">请家长在家庭端填写<strong>出生日期</strong>后，系统才能按年龄给出参考区间（非医疗诊断）。</p>
         {% endif %}
@@ -1116,7 +1154,7 @@
     </div>
 
     <!-- 健康数据区域 -->
-    <div class="health-section" style="background: white; border-radius: 16px; padding: 30px; margin-bottom: 15px; max-width: 800px; margin-left: auto; margin-right: auto;">
+    <div class="health-section" id="sec-health" style="background: white; border-radius: 16px; padding: 30px; margin-bottom: 15px; max-width: 800px; margin-left: auto; margin-right: auto;">
         <h2 class="section-title">手环健康数据</h2>
         <div id="healthDataSection">
             <div class="empty-state" style="padding: 20px;">
@@ -1210,7 +1248,7 @@
         </div>
     </div>
 
-    <div class="meal-section">
+    <div class="meal-section" id="sec-ai-meal">
         <h2 class="section-title">AI 膳食识别</h2>
         <div class="meal-upload" onclick="openMealModal()">
             <div class="meal-upload-icon"><span class="icon icon-camera"></span></div>
@@ -1221,9 +1259,14 @@
         <h3 style="font-size: 14px; color: #666; margin-bottom: 10px;">今日膳食记录</h3>
         <div class="meal-records">
             {% for meal in today_meals %}
-            <div class="meal-record">
+            <div class="meal-record {% if meal.allergy_hits %}meal-record-warning{% endif %}">
                 <div class="meal-type">{{ meal.get_meal_type_display }}</div>
                 <div class="meal-score">{{ meal.total_score }}<span>/5分</span></div>
+                {% if meal.allergy_hits %}
+                <div style="margin-top:6px;font-size:11px;color:#c62828;">
+                    {% for hit in meal.allergy_hits %}<span>⚠️ 过敏：{{ hit.food }}</span>{% endfor %}
+                </div>
+                {% endif %}
             </div>
             {% empty %}
             <div class="empty-state" style="grid-column: 1/-1;">
@@ -1233,7 +1276,7 @@
         </div>
     </div>
 
-    <div class="tasks-section">
+    <div class="tasks-section" id="sec-tasks">
         <h2 class="section-title">今日任务</h2>
         <div class="task-grid">
             {% for item in daily_records %}
@@ -1258,7 +1301,7 @@
     </div>
 
     {% if active_challenges %}
-    <div class="challenge-section">
+    <div class="challenge-section" id="sec-challenges">
         <h2 class="section-title">进行中的挑战</h2>
         {% for progress in active_challenges %}
         <div class="challenge-item">
@@ -1278,7 +1321,7 @@
     {% endif %}
 
     {% if badges %}
-    <div class="badges-section">
+    <div class="badges-section" id="sec-badges">
         <h2 class="section-title">我的徽章</h2>
         <div class="badges-grid">
             {% for badge in badges %}
@@ -1291,7 +1334,7 @@
     {% endif %}
 
     {% if encouragements %}
-    <div class="encouragement-section">
+    <div class="encouragement-section" id="sec-encouragements">
         <h2 class="section-title">家长鼓励</h2>
         <div class="encouragement-list">
             {% for enc in encouragements %}

@@ -50,6 +50,7 @@ urlpatterns = [
     path('parent/alerts/<int:alert_id>/read/', views.parent_mark_alert_read, name='parent_mark_alert_read'),
     path('parent/recipes/', views.parent_recipes, name='parent_recipes'),
     path('parent/recipes/add/', views.parent_recipe_create, name='parent_recipe_create'),
+    path('parent/recipes/batch-import/', views.parent_recipe_batch_import, name='parent_recipe_batch_import'),
     path('parent/meal-report/', views.parent_meal_report, name='parent_meal_report'),
     path('parent/export-weekly-pdf/', views.parent_export_weekly_pdf, name='parent_export_weekly_pdf'),
     path('parent/add-to-class/', views.parent_add_to_class, name='parent_add_to_class'),

@@ -57,7 +57,16 @@
       "Bash(\"/d/Applications/anaconda/python.exe\" -c \"from ultralytics import YOLO; model = YOLO\\('runs/fruit_train/weights/last.pt'\\); model.train\\(data='fruits/data.yaml', epochs=70, imgsz=640, device=0, batch=8\\)\")",
       "Bash(\"/d/Applications/anaconda/python.exe\" -c \"from ultralytics import YOLO; model = YOLO\\('runs/fruit_train/weights/last.pt'\\); model.train\\(data='fruits/data.yaml', epochs=70, imgsz=416, device=0, batch=16, cache=True, workers=4\\)\")",
       "Bash(python manage.py shell -c ' *)",
-      "Bash(python manage.py makemigrations core --name add_user_to_child)"
+      "Bash(python manage.py makemigrations core --name add_user_to_child)",
+      "Bash(python manage.py runserver)",
+      "Bash(python manage.py shell -c \"from ultralytics import YOLO; print\\(YOLO\\('runs/vegetable_train_v2/weights/last.pt'\\).names\\)\")",
+      "Bash(python -c \"import torch; print\\('torch version:', torch.__version__\\)\")",
+      "Bash(D:/Applications/anaconda/python.exe -c \"import torch; print\\('torch:', torch.__version__\\)\")",
+      "Bash(KMP_DUPLICATE_LIB_OK=TRUE D:/Applications/anaconda/python.exe -c \"import torch; print\\('torch:', torch.__version__\\)\")",
+      "Bash(KMP_DUPLICATE_LIB_OK=TRUE D:/Applications/anaconda/python.exe manage.py shell -c \"from ultralytics import YOLO; print\\('ultralytics OK'\\); print\\('torch OK:', import torch; torch.__version__\\)\")",
+      "Bash(KMP_DUPLICATE_LIB_OK=TRUE D:/Applications/anaconda/python.exe manage.py shell -c ' *)",
+      "Bash(python -c \"import sys; print\\('Python:', sys.executable\\)\")",
+      "Bash(python -c \"import sys; print\\(sys.version\\)\")"
     ],
     "additionalDirectories": [
       "D:\\User\\Documents\\PycharmProjects\\DjangoProject333\\runs\\detect\\train-2\\weights"
